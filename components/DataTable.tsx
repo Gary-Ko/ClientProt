@@ -1,12 +1,13 @@
 
-import React, { useState, useEffect } from 'react';
-import { SettlementReport, ClientSummary, CashFlowTransaction, PageContext, TransactionType, CashFlowStatus, OpenPosition, ClosedPosition } from '../types';
+import React, { useState, useEffect, useMemo } from 'react';
+import { SettlementReport, ClientSummary, CashFlowTransaction, PageContext, TransactionType, CashFlowStatus, OpenPosition, ClosedPosition, CommissionDetail } from '../types';
 import { formatCurrency, formatNumber } from '../utils';
 import { ChevronLeft, ChevronRight, Eye, HelpCircle, User, ArrowUpRight, ArrowDownLeft, Repeat } from 'lucide-react';
+import { MOCK_DETAILS } from '../constants';
 
 interface DataTableProps {
-  viewMode: 'summary' | 'clients';
-  setViewMode: (mode: 'summary' | 'clients') => void;
+  viewMode: 'clients' | 'details';
+  setViewMode: (mode: 'clients' | 'details') => void;
   settlementData: SettlementReport[];
   clientData: ClientSummary[];
   cashFlowData: CashFlowTransaction[];
@@ -14,6 +15,8 @@ interface DataTableProps {
   closedPositionsData?: ClosedPosition[];
   onViewSettlement: (settlement: SettlementReport) => void;
   pageContext: PageContext;
+  clientNameFilter?: string;
+  setClientNameFilter?: (name: string) => void;
 }
 
 const DataTable: React.FC<DataTableProps> = ({ 
@@ -25,17 +28,26 @@ const DataTable: React.FC<DataTableProps> = ({
   openPositionsData = [],
   closedPositionsData = [],
   onViewSettlement,
-  pageContext
+  pageContext,
+  clientNameFilter = '',
+  setClientNameFilter
 }) => {
   const [currentPage, setCurrentPage] = useState(1);
   
   // Requirement: Default 5 items for Positions page, 10 for others
   const itemsPerPage = (pageContext === 'positions' || pageContext === 'closed') ? 5 : 10;
   
+  // Filter commission details by client name if filter is set
+  const filteredCommissionDetails = useMemo(() => {
+    if (pageContext !== 'commission' || viewMode !== 'details') return [];
+    if (!clientNameFilter) return MOCK_DETAILS;
+    return MOCK_DETAILS.filter(detail => detail.clientName === clientNameFilter);
+  }, [pageContext, viewMode, clientNameFilter]);
+  
   // Reset page when switching views or data changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [viewMode, pageContext, settlementData.length, clientData.length, cashFlowData.length, openPositionsData.length, closedPositionsData.length]);
+  }, [viewMode, pageContext, settlementData.length, clientData.length, cashFlowData.length, openPositionsData.length, closedPositionsData.length, filteredCommissionDetails.length]);
 
   // Helper for Transaction Status styling
   const getStatusStyle = (status: CashFlowStatus | string) => {
@@ -85,7 +97,7 @@ const DataTable: React.FC<DataTableProps> = ({
                   Est. Commission
                   <HelpCircle size={14} className="text-slate-400" />
                   <div className="absolute bottom-full right-0 mb-2 w-64 p-2 bg-slate-800 text-white text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 normal-case font-normal">
-                    Est. Commission中显示的是佣金金额对应的美元金额
+                    Est. Commission shows the commission amount converted to USD
                     <div className="absolute top-full right-2 -mt-1 border-4 border-transparent border-t-slate-800"></div>
                   </div>
                 </div>
@@ -144,61 +156,77 @@ const DataTable: React.FC<DataTableProps> = ({
         return <div className="p-8 text-center text-slate-500">No client records found.</div>;
     }
 
+    const handleViewDetails = (clientName: string) => {
+      if (setClientNameFilter) {
+        setClientNameFilter(clientName);
+      }
+      setViewMode('details');
+    };
+
     return (
       <div className="overflow-x-auto">
         <table className="w-full text-sm text-left">
           <thead className="text-xs text-slate-500 uppercase bg-slate-50 border-b border-slate-200">
             <tr>
-              <th className="px-6 py-3 font-semibold whitespace-nowrap">Client Account</th>
+              <th className="px-6 py-3 font-semibold whitespace-nowrap">Client ID</th>
+              <th className="px-6 py-3 font-semibold whitespace-nowrap">Client Name</th>
               <th className="px-6 py-3 font-semibold whitespace-nowrap">Client Identity</th>
-              <th className="px-6 py-3 font-semibold whitespace-nowrap text-right">Trading Scale</th>
-              <th className="px-6 py-3 font-semibold whitespace-nowrap text-right">Contributed Commission</th>
-              <th className="px-6 py-3 font-semibold whitespace-nowrap text-right">Client Net P/L</th>
-              <th className="px-6 py-3 font-semibold whitespace-nowrap text-right">Contribution Ratio</th>
+              <th className="px-6 py-3 font-semibold text-right whitespace-nowrap">Trading Lots</th>
+              <th className="px-6 py-3 font-semibold text-right whitespace-nowrap">Number of Orders</th>
+              <th className="px-6 py-3 font-semibold text-right whitespace-nowrap">
+                <div className="flex items-center justify-end gap-1 group relative cursor-help">
+                  Est. Commission
+                  <HelpCircle size={14} className="text-slate-400" />
+                  <div className="absolute bottom-full right-0 mb-2 w-64 p-2 bg-slate-800 text-white text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-[9999] normal-case font-normal">
+                    Converted from actual commission to USD for display
+                    <div className="absolute top-full right-2 -mt-1 border-4 border-transparent border-t-slate-800"></div>
+                  </div>
+                </div>
+              </th>
+              <th className="px-6 py-3 font-semibold text-right whitespace-nowrap">Actual Commission</th>
+              <th className="px-6 py-3 font-semibold whitespace-nowrap">Currency</th>
+              <th className="px-6 py-3 font-semibold text-right whitespace-nowrap">Settled</th>
+              <th className="px-6 py-3 font-semibold text-right whitespace-nowrap">Pending</th>
+              <th className="px-6 py-3 font-semibold text-center whitespace-nowrap">Action</th>
             </tr>
           </thead>
           <tbody>
             {paginatedData.map((row) => (
               <tr key={row.clientId} className="bg-white border-b border-slate-100 hover:bg-slate-50 transition-colors">
-                <td className="px-6 py-4 font-medium text-slate-900">
-                  <div className="flex items-center gap-2">
-                    <div className="p-1 bg-slate-100 rounded text-slate-500">
-                      <User size={14} />
-                    </div>
-                    {row.clientId}
-                  </div>
+                <td className="px-6 py-4 font-medium text-slate-900">{row.clientId}</td>
+                <td className="px-6 py-4 text-slate-700 font-medium">{row.clientName}</td>
+                <td className="px-6 py-4 text-slate-600">
+                  {row.identity === 'Direct' ? 'Direct' : 'Agent'}
                 </td>
-                <td className="px-6 py-4 text-slate-700">
-                  <div className="flex flex-col">
-                    <span className="font-medium">
-                      {row.identity === 'Direct' ? 'Direct' : 'Agent'}: {row.clientName}
-                    </span>
-                    {row.relatedInfo && (
-                      <span className="text-xs text-slate-400 mt-0.5">
-                        ({row.relatedInfo})
-                      </span>
-                    )}
-                  </div>
+                <td className="px-6 py-4 text-right font-medium text-slate-700">
+                  {formatNumber(row.tradingLots)}
                 </td>
-                <td className="px-6 py-4 text-right font-medium text-slate-600">
-                  {formatNumber(row.tradingVolume)} lots
+                <td className="px-6 py-4 text-right font-medium text-slate-700">
+                  {formatNumber(row.orderCount)}
                 </td>
                 <td className="px-6 py-4 text-right font-bold text-emerald-600">
                   {formatCurrency(row.contributedCommission)}
                 </td>
-                <td className={`px-6 py-4 text-right font-medium ${row.netProfitLoss >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                  {formatCurrency(row.netProfitLoss)}
+                <td className="px-6 py-4 text-right font-medium text-slate-700">
+                  {formatCurrency(row.originalCommission)}
                 </td>
-                <td className="px-6 py-4 text-right text-slate-600">
-                  <div className="flex items-center justify-end gap-2">
-                    <span className="text-xs">{row.commissionPercentage}%</span>
-                    <div className="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-primary-500 rounded-full" 
-                        style={{ width: `${Math.min(row.commissionPercentage, 100)}%` }}
-                      ></div>
-                    </div>
-                  </div>
+                <td className="px-6 py-4 text-slate-600 font-medium">
+                  {row.currency}
+                </td>
+                <td className="px-6 py-4 text-right font-medium text-emerald-600">
+                  {formatCurrency(row.settledAmount)}
+                </td>
+                <td className="px-6 py-4 text-right font-medium text-amber-600">
+                  {formatCurrency(row.pendingAmount)}
+                </td>
+                <td className="px-6 py-4 text-center">
+                  <button 
+                    onClick={() => handleViewDetails(row.clientName)}
+                    className="inline-flex items-center gap-1 text-primary-600 hover:text-primary-800 font-medium px-3 py-1.5 rounded-md hover:bg-primary-50 transition-colors"
+                  >
+                    <Eye size={14} />
+                    View Details
+                  </button>
                 </td>
               </tr>
             ))}
@@ -249,15 +277,15 @@ const DataTable: React.FC<DataTableProps> = ({
                     onMouseEnter={handleMouseEnter}
                     onMouseLeave={handleMouseLeave}
                   >
-                    预估金额
+                    Est. Amount
                     <HelpCircle size={14} className="text-slate-400" />
                   </div>
                 </th>
-                <th className="px-6 py-3 font-semibold text-right whitespace-nowrap">实际金额</th>
+                <th className="px-6 py-3 font-semibold text-right whitespace-nowrap">Actual Amount</th>
                 <th className="px-6 py-3 font-semibold text-center whitespace-nowrap">Status</th>
                 <th className="px-6 py-3 font-semibold text-right whitespace-nowrap">Submit Time</th>
                 <th className="px-6 py-3 font-semibold text-right whitespace-nowrap">Complete Time</th>
-                <th className="px-6 py-3 font-semibold whitespace-nowrap">备注</th>
+                <th className="px-6 py-3 font-semibold whitespace-nowrap">Remarks</th>
               </tr>
             </thead>
             <tbody>
@@ -317,12 +345,12 @@ const DataTable: React.FC<DataTableProps> = ({
               transform: 'translateY(calc(-100% - 8px))'
             }}
           >
-            根据实际金额换算成美元，便于展示
+            Converted from actual amount to USD for display
             <div className="absolute top-full right-2 -mt-1 border-4 border-transparent border-t-slate-800"></div>
           </div>
         )}
         </>
-    );
+      );
   };
 
   // Table 4: Open Positions Table
@@ -338,22 +366,22 @@ const DataTable: React.FC<DataTableProps> = ({
           <table className="w-full text-sm text-left">
             <thead className="text-xs text-slate-500 uppercase bg-slate-50 border-b border-slate-200">
               <tr>
-                <th className="px-6 py-3 font-semibold whitespace-nowrap">订单号</th>
-                <th className="px-6 py-3 font-semibold whitespace-nowrap">客户名称</th>
-                <th className="px-6 py-3 font-semibold whitespace-nowrap">客户关系</th>
-                <th className="px-6 py-3 font-semibold whitespace-nowrap">交易账户</th>
-                <th className="px-6 py-3 font-semibold whitespace-nowrap">开仓时间</th>
-                <th className="px-6 py-3 font-semibold whitespace-nowrap">交易方向</th>
-                <th className="px-6 py-3 font-semibold whitespace-nowrap">交易品种</th>
-                <th className="px-6 py-3 font-semibold text-right whitespace-nowrap">手数</th>
-                <th className="px-6 py-3 font-semibold text-right whitespace-nowrap">开仓价格</th>
-                <th className="px-6 py-3 font-semibold text-right whitespace-nowrap">当前价格</th>
-                <th className="px-6 py-3 font-semibold text-right whitespace-nowrap">止盈</th>
-                <th className="px-6 py-3 font-semibold text-right whitespace-nowrap">止损</th>
-                <th className="px-6 py-3 font-semibold text-right whitespace-nowrap">手续费</th>
-                <th className="px-6 py-3 font-semibold text-right whitespace-nowrap">库存费</th>
-                <th className="px-6 py-3 font-semibold text-right whitespace-nowrap">盈亏</th>
-                <th className="px-6 py-3 font-semibold whitespace-nowrap">备注</th>
+                <th className="px-6 py-3 font-semibold whitespace-nowrap">Order No.</th>
+                <th className="px-6 py-3 font-semibold whitespace-nowrap">Client Name</th>
+                <th className="px-6 py-3 font-semibold whitespace-nowrap">Client Relation</th>
+                <th className="px-6 py-3 font-semibold whitespace-nowrap">Trading Account</th>
+                <th className="px-6 py-3 font-semibold whitespace-nowrap">Open Time</th>
+                <th className="px-6 py-3 font-semibold whitespace-nowrap">Trading Direction</th>
+                <th className="px-6 py-3 font-semibold whitespace-nowrap">Trading Symbol</th>
+                <th className="px-6 py-3 font-semibold text-right whitespace-nowrap">Lots</th>
+                <th className="px-6 py-3 font-semibold text-right whitespace-nowrap">Open Price</th>
+                <th className="px-6 py-3 font-semibold text-right whitespace-nowrap">Current Price</th>
+                <th className="px-6 py-3 font-semibold text-right whitespace-nowrap">Take Profit</th>
+                <th className="px-6 py-3 font-semibold text-right whitespace-nowrap">Stop Loss</th>
+                <th className="px-6 py-3 font-semibold text-right whitespace-nowrap">Commission</th>
+                <th className="px-6 py-3 font-semibold text-right whitespace-nowrap">Swap</th>
+                <th className="px-6 py-3 font-semibold text-right whitespace-nowrap">P/L</th>
+                <th className="px-6 py-3 font-semibold whitespace-nowrap">Remarks</th>
               </tr>
             </thead>
             <tbody>
@@ -371,14 +399,14 @@ const DataTable: React.FC<DataTableProps> = ({
                     </div>
                   </td>
                   <td className="px-6 py-4 text-slate-600">
-                    {row.sourceType === 'Direct' ? '直客' : '代理'}
+                    {row.sourceType === 'Direct' ? 'Direct' : 'Agent'}
                   </td>
                   <td className="px-6 py-4 font-medium text-slate-900">{row.accountId}</td>
                   <td className="px-6 py-4 text-slate-500 text-xs">{row.openTime}</td>
                   <td className="px-6 py-4">
                      <span className={`text-xs uppercase font-bold px-2 py-1 rounded ${row.direction === 'Buy' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
-                         {row.direction === 'Buy' ? '多' : '空'}
-                     </span>
+                         {row.direction === 'Buy' ? 'Long' : 'Short'}
+                         </span>
                   </td>
                   <td className="px-6 py-4 font-semibold text-slate-900">{row.symbol}</td>
                   <td className="px-6 py-4 text-right font-medium">{formatNumber(row.lots)}</td>
@@ -413,24 +441,24 @@ const DataTable: React.FC<DataTableProps> = ({
           <table className="w-full text-sm text-left">
             <thead className="text-xs text-slate-500 uppercase bg-slate-50 border-b border-slate-200">
               <tr>
-                <th className="px-6 py-3 font-semibold whitespace-nowrap">订单号</th>
-                <th className="px-6 py-3 font-semibold whitespace-nowrap">交易服务器</th>
-                <th className="px-6 py-3 font-semibold whitespace-nowrap">客户名称</th>
-                <th className="px-6 py-3 font-semibold whitespace-nowrap">客户关系</th>
-                <th className="px-6 py-3 font-semibold whitespace-nowrap">交易账号</th>
-                <th className="px-6 py-3 font-semibold whitespace-nowrap">开仓时间</th>
-                <th className="px-6 py-3 font-semibold whitespace-nowrap">交易方向</th>
-                <th className="px-6 py-3 font-semibold whitespace-nowrap">交易品种</th>
-                <th className="px-6 py-3 font-semibold text-right whitespace-nowrap">手数</th>
-                <th className="px-6 py-3 font-semibold text-right whitespace-nowrap">开仓价格</th>
-                <th className="px-6 py-3 font-semibold text-right whitespace-nowrap">平仓价格</th>
-                <th className="px-6 py-3 font-semibold text-right whitespace-nowrap">止盈</th>
-                <th className="px-6 py-3 font-semibold text-right whitespace-nowrap">止损</th>
-                <th className="px-6 py-3 font-semibold whitespace-nowrap">平仓时间</th>
-                <th className="px-6 py-3 font-semibold text-right whitespace-nowrap">手续费</th>
-                <th className="px-6 py-3 font-semibold text-right whitespace-nowrap">库存费</th>
-                <th className="px-6 py-3 font-semibold text-right whitespace-nowrap">盈亏</th>
-                <th className="px-6 py-3 font-semibold whitespace-nowrap">备注</th>
+                <th className="px-6 py-3 font-semibold whitespace-nowrap">Order No.</th>
+                <th className="px-6 py-3 font-semibold whitespace-nowrap">Trading Server</th>
+                <th className="px-6 py-3 font-semibold whitespace-nowrap">Client Name</th>
+                <th className="px-6 py-3 font-semibold whitespace-nowrap">Client Relation</th>
+                <th className="px-6 py-3 font-semibold whitespace-nowrap">Trading Account</th>
+                <th className="px-6 py-3 font-semibold whitespace-nowrap">Open Time</th>
+                <th className="px-6 py-3 font-semibold whitespace-nowrap">Trading Direction</th>
+                <th className="px-6 py-3 font-semibold whitespace-nowrap">Trading Symbol</th>
+                <th className="px-6 py-3 font-semibold text-right whitespace-nowrap">Lots</th>
+                <th className="px-6 py-3 font-semibold text-right whitespace-nowrap">Open Price</th>
+                <th className="px-6 py-3 font-semibold text-right whitespace-nowrap">Close Price</th>
+                <th className="px-6 py-3 font-semibold text-right whitespace-nowrap">Take Profit</th>
+                <th className="px-6 py-3 font-semibold text-right whitespace-nowrap">Stop Loss</th>
+                <th className="px-6 py-3 font-semibold whitespace-nowrap">Close Time</th>
+                <th className="px-6 py-3 font-semibold text-right whitespace-nowrap">Commission</th>
+                <th className="px-6 py-3 font-semibold text-right whitespace-nowrap">Swap</th>
+                <th className="px-6 py-3 font-semibold text-right whitespace-nowrap">P/L</th>
+                <th className="px-6 py-3 font-semibold whitespace-nowrap">Remarks</th>
               </tr>
             </thead>
             <tbody>
@@ -449,13 +477,13 @@ const DataTable: React.FC<DataTableProps> = ({
                     </div>
                   </td>
                   <td className="px-6 py-4 text-slate-600">
-                    {row.sourceType === 'Direct' ? '直客' : '代理'}
+                    {row.sourceType === 'Direct' ? 'Direct' : 'Agent'}
                   </td>
                   <td className="px-6 py-4 font-medium text-slate-900">{row.accountId}</td>
                   <td className="px-6 py-4 text-slate-500 text-xs">{row.openTime}</td>
                   <td className="px-6 py-4">
                      <span className={`text-xs uppercase font-bold px-2 py-1 rounded ${row.direction === 'Buy' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
-                         {row.direction === 'Buy' ? '多' : '空'}
+                         {row.direction === 'Buy' ? 'Long' : 'Short'}
                      </span>
                   </td>
                   <td className="px-6 py-4 font-semibold text-slate-900">{row.symbol}</td>
@@ -479,10 +507,83 @@ const DataTable: React.FC<DataTableProps> = ({
     );
   };
 
+  // Table 6: Commission Details
+  const CommissionDetailsTable = () => {
+    const paginatedData = filteredCommissionDetails.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
+    if (filteredCommissionDetails.length === 0) {
+        return <div className="p-8 text-center text-slate-500">No commission details found.</div>;
+    }
+
+    return (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm text-left">
+            <thead className="text-xs text-slate-500 uppercase bg-slate-50 border-b border-slate-200 sticky top-0 z-10">
+              <tr>
+                <th className="px-6 py-3 font-semibold whitespace-nowrap">Order No.</th>
+                <th className="px-6 py-3 font-semibold whitespace-nowrap">Client Name</th>
+                <th className="px-6 py-3 font-semibold whitespace-nowrap">Client Relation</th>
+                <th className="px-6 py-3 font-semibold whitespace-nowrap">Trading Account</th>
+                <th className="px-6 py-3 font-semibold whitespace-nowrap">Open Time</th>
+                <th className="px-6 py-3 font-semibold whitespace-nowrap">Close Time</th>
+                <th className="px-6 py-3 font-semibold whitespace-nowrap">Trading Direction</th>
+                <th className="px-6 py-3 font-semibold whitespace-nowrap">Trading Symbol</th>
+                <th className="px-6 py-3 font-semibold text-right whitespace-nowrap">Lots</th>
+                <th className="px-6 py-3 font-semibold text-right whitespace-nowrap">Rebate Standard</th>
+                <th className="px-6 py-3 font-semibold text-right whitespace-nowrap">Commission Amount</th>
+                <th className="px-6 py-3 font-semibold whitespace-nowrap">Currency</th>
+                <th className="px-6 py-3 font-semibold text-center whitespace-nowrap">Status</th>
+                <th className="px-6 py-3 font-semibold whitespace-nowrap">Settlement Time</th>
+                <th className="px-6 py-3 font-semibold whitespace-nowrap">Remarks</th>
+              </tr>
+            </thead>
+            <tbody>
+              {paginatedData.map((row) => (
+                <tr key={row.id} className="bg-white border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                  <td className="px-6 py-4 font-medium text-slate-900">{row.orderId}</td>
+                  <td className="px-6 py-4 text-slate-700 font-medium">{row.clientName}</td>
+                  <td className="px-6 py-4 text-slate-600">
+                    {row.sourceType === 'Direct' ? 'Direct' : 'Agent'}
+                  </td>
+                  <td className="px-6 py-4 font-medium text-slate-900">{row.account}</td>
+                  <td className="px-6 py-4 text-slate-500 text-xs">{row.openTime}</td>
+                  <td className="px-6 py-4 text-slate-500 text-xs">{row.closeTime}</td>
+                  <td className="px-6 py-4">
+                     <span className={`text-xs uppercase font-bold px-2 py-1 rounded ${row.direction === 'Buy' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                         {row.direction === 'Buy' ? 'Buy' : 'Sell'}
+                     </span>
+                  </td>
+                  <td className="px-6 py-4 font-semibold text-slate-900">{row.symbol}</td>
+                  <td className="px-6 py-4 text-right font-medium">{formatNumber(row.lots)}</td>
+                  <td className="px-6 py-4 text-right text-slate-700">{formatNumber(row.rate)}</td>
+                  <td className="px-6 py-4 text-right font-bold text-emerald-600">
+                    {formatCurrency(row.amount)}
+                  </td>
+                  <td className="px-6 py-4 text-slate-600 font-medium">
+                    {row.currency}
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    <span className={`inline-flex px-2 py-1 rounded text-xs font-medium ${getStatusStyle(row.status)}`}>
+                      {row.status === 'Settled' ? 'Settled' : 'Pending'}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-slate-500 text-xs">{row.settleTime || '--'}</td>
+                  <td className="px-6 py-4 text-slate-500 italic text-xs">{row.comment || '--'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+    );
+  };
+
   const currentCount = 
+    pageContext === 'settlement' ? settlementData.length :
     pageContext === 'cashflow' ? cashFlowData.length :
     pageContext === 'positions' ? openPositionsData.length :
-    viewMode === 'summary' ? settlementData.length : clientData.length;
+    pageContext === 'closed' ? closedPositionsData.length :
+    viewMode === 'details' ? filteredCommissionDetails.length :
+    clientData.length;
     
   const maxPage = Math.ceil(currentCount / itemsPerPage);
 
@@ -490,24 +591,43 @@ const DataTable: React.FC<DataTableProps> = ({
     <div className="bg-white rounded-xl shadow-sm border border-slate-100 flex flex-col">
       {/* Header / Tabs */}
       <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-4">
-        {pageContext === 'commission' ? (
+        {pageContext === 'settlement' ? (
+            <div className="text-lg font-semibold text-slate-800 flex items-center gap-2">
+                Settlement Report
+                <span className="text-xs font-normal text-slate-500 bg-slate-100 px-2 py-1 rounded-full">
+                    {currentCount} records
+                </span>
+            </div>
+        ) : pageContext === 'commission' ? (
             <div className="flex p-1 bg-slate-100 rounded-lg w-full sm:w-auto">
             <button 
-                onClick={() => setViewMode('summary')}
-                className={`flex-1 sm:flex-none px-4 py-2 text-sm font-medium rounded-md transition-all ${
-                viewMode === 'summary' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-                }`}
-            >
-                Settlement Reports
-            </button>
-            <button 
-                onClick={() => setViewMode('clients')}
+                onClick={() => {
+                  setViewMode('clients');
+                  if (setClientNameFilter) setClientNameFilter('');
+                }}
                 className={`flex-1 sm:flex-none px-4 py-2 text-sm font-medium rounded-md transition-all ${
                 viewMode === 'clients' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
                 }`}
             >
                 Client Commission
             </button>
+            <button 
+                onClick={() => {
+                  setViewMode('details');
+                }}
+                className={`flex-1 sm:flex-none px-4 py-2 text-sm font-medium rounded-md transition-all ${
+                viewMode === 'details' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                }`}
+            >
+                Commission Details
+            </button>
+            </div>
+        ) : pageContext === 'settlement' ? (
+            <div className="text-lg font-semibold text-slate-800 flex items-center gap-2">
+                Settlement Report
+                <span className="text-xs font-normal text-slate-500 bg-slate-100 px-2 py-1 rounded-full">
+                    {currentCount} records
+                </span>
             </div>
         ) : (
             <div className="text-lg font-semibold text-slate-800 flex items-center gap-2">
@@ -521,10 +641,12 @@ const DataTable: React.FC<DataTableProps> = ({
 
       {/* Content */}
       <div className="flex-1 min-h-[400px]">
-        {pageContext === 'cashflow' ? <CashFlowTable /> : 
+        {pageContext === 'settlement' ? <SettlementTable /> :
+         pageContext === 'cashflow' ? <CashFlowTable /> : 
          pageContext === 'positions' ? <PositionsTable /> :
          pageContext === 'closed' ? <ClosedTable /> :
-         viewMode === 'summary' ? <SettlementTable /> : <ClientTable />}
+         viewMode === 'details' ? <CommissionDetailsTable /> :
+         <ClientTable />}
       </div>
 
       {/* Footer / Pagination */}

@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { FilterState, ClientRelation, CommissionStatus, CashFlowStatus, DateRangeOption, PageContext } from '../types';
-import { TRADING_SYMBOLS } from '../constants';
+import { TRADING_SYMBOLS, CURRENCIES } from '../constants';
 import { Download, Filter, Search, X, ChevronDown, Check } from 'lucide-react';
 
 interface FilterBarProps {
@@ -16,9 +16,11 @@ interface FilterBarProps {
 const FilterBar: React.FC<FilterBarProps> = ({ filters, setFilters, searchTerm, setSearchTerm, onExport, pageContext }) => {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [isSymbolDropdownOpen, setIsSymbolDropdownOpen] = useState(false);
+  const [isCurrencyDropdownOpen, setIsCurrencyDropdownOpen] = useState(false);
   
   const filterRef = useRef<HTMLDivElement>(null);
   const symbolDropdownRef = useRef<HTMLDivElement>(null);
+  const currencyDropdownRef = useRef<HTMLDivElement>(null);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -28,6 +30,9 @@ const FilterBar: React.FC<FilterBarProps> = ({ filters, setFilters, searchTerm, 
       }
       if (symbolDropdownRef.current && !symbolDropdownRef.current.contains(event.target as Node)) {
         setIsSymbolDropdownOpen(false);
+      }
+      if (currencyDropdownRef.current && !currencyDropdownRef.current.contains(event.target as Node)) {
+        setIsCurrencyDropdownOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -48,6 +53,7 @@ const FilterBar: React.FC<FilterBarProps> = ({ filters, setFilters, searchTerm, 
       relation: ClientRelation.ALL,
       symbol: 'All',
       selectedSymbols: ['All'],
+      selectedCurrencies: ['All'],
       direction: 'All',
       status: pageContext === 'commission' ? CommissionStatus.ALL : pageContext === 'cashflow' ? CashFlowStatus.ALL : 'All'
     }));
@@ -69,6 +75,24 @@ const FilterBar: React.FC<FilterBarProps> = ({ filters, setFilters, searchTerm, 
           if (current.length === 0) current = ['All'];
       }
       setFilters(prev => ({ ...prev, selectedSymbols: current }));
+  };
+
+  const toggleCurrency = (currency: string) => {
+      let current = [...(filters.selectedCurrencies || ['All'])];
+      if (currency === 'All') {
+          current = ['All'];
+      } else {
+          if (current.includes('All')) current = [];
+          
+          if (current.includes(currency)) {
+              current = current.filter(c => c !== currency);
+          } else {
+              current.push(currency);
+          }
+          
+          if (current.length === 0) current = ['All'];
+      }
+      setFilters(prev => ({ ...prev, selectedCurrencies: current }));
   };
 
   // Define available options based on context
@@ -95,13 +119,14 @@ const FilterBar: React.FC<FilterBarProps> = ({ filters, setFilters, searchTerm, 
         value: filters.status,
         defaultValue: pageContext === 'commission' ? CommissionStatus.ALL : CashFlowStatus.ALL
     }] : []),
-    // Symbol & Direction for Commission & Positions & Closed
-    ...(pageContext === 'commission' ? [{
-      key: 'symbol',
-      label: 'Trading Symbol',
-      value: filters.symbol,
-      defaultValue: 'All'
+    // Currency Multi-select for Commission Page
+    ...(pageContext === 'commission' && filters.selectedCurrencies && !filters.selectedCurrencies.includes('All') ? [{
+        key: 'selectedCurrencies',
+        label: 'Currency',
+        value: filters.selectedCurrencies.length > 2 ? `${filters.selectedCurrencies.length} selected` : filters.selectedCurrencies.join(', '),
+        defaultValue: ['All']
     }] : []),
+    // Symbol & Direction for Positions & Closed (removed for commission)
     ...((pageContext === 'positions' || pageContext === 'closed') && filters.selectedSymbols && !filters.selectedSymbols.includes('All') ? [{
         key: 'selectedSymbols',
         label: 'Symbols',
@@ -173,28 +198,30 @@ const FilterBar: React.FC<FilterBarProps> = ({ filters, setFilters, searchTerm, 
                 </div>
 
                 <div className="space-y-5">
-                  {/* Relation / Tier View */}
-                  <div className="space-y-2">
-                    <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{relationLabel}</label>
-                    <div className="flex flex-wrap gap-2">
-                      {relationOptions.map(val => (
-                        <button
-                          key={val}
-                          onClick={() => setFilters(prev => ({ ...prev, relation: val }))}
-                          className={`px-3 py-1.5 text-xs rounded-md border transition-all ${
-                            filters.relation === val
-                              ? 'bg-primary-600 border-primary-600 text-white shadow-sm'
-                              : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'
-                          }`}
-                        >
-                          {val}
-                        </button>
-                      ))}
+                  {/* Relation / Tier View - Hide for Settlement Page */}
+                  {pageContext !== 'settlement' && (
+                    <div className="space-y-2">
+                      <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{relationLabel}</label>
+                      <div className="flex flex-wrap gap-2">
+                        {relationOptions.map(val => (
+                          <button
+                            key={val}
+                            onClick={() => setFilters(prev => ({ ...prev, relation: val }))}
+                            className={`px-3 py-1.5 text-xs rounded-md border transition-all ${
+                              filters.relation === val
+                                ? 'bg-primary-600 border-primary-600 text-white shadow-sm'
+                                : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'
+                            }`}
+                          >
+                            {val}
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                  </div>
+                  )}
 
-                  {/* Status (Not for Positions or Closed) */}
-                  {pageContext !== 'positions' && pageContext !== 'closed' && (
+                  {/* Status (Not for Positions, Closed, or Settlement) */}
+                  {pageContext !== 'positions' && pageContext !== 'closed' && pageContext !== 'settlement' && (
                     <div className="space-y-2">
                         <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</label>
                         <div className="flex flex-wrap gap-2">
@@ -215,23 +242,42 @@ const FilterBar: React.FC<FilterBarProps> = ({ filters, setFilters, searchTerm, 
                     </div>
                   )}
 
-                  {/* Trading Symbol - Commission Page (Single Select) */}
-                  {pageContext === 'commission' && (
-                    <div className="space-y-2">
-                        <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Trading Symbol</label>
+                  {/* Currency Multi-select for Commission and Settlement Pages */}
+                  {(pageContext === 'commission' || pageContext === 'settlement') && (
+                    <div className="space-y-2" ref={currencyDropdownRef}>
+                        <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Currency</label>
                         <div className="relative">
-                        <select 
-                            className="w-full appearance-none px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 cursor-pointer"
-                            value={filters.symbol}
-                            onChange={(e) => setFilters(prev => ({ ...prev, symbol: e.target.value }))}
-                        >
-                            {TRADING_SYMBOLS.map(sym => (
-                            <option key={sym} value={sym}>{sym}</option>
-                            ))}
-                        </select>
-                        <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none text-slate-500">
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
-                        </div>
+                            <button 
+                                onClick={() => setIsCurrencyDropdownOpen(!isCurrencyDropdownOpen)}
+                                className="w-full flex items-center justify-between px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all text-left"
+                            >
+                                <span className="truncate">
+                                    {filters.selectedCurrencies?.includes('All') 
+                                        ? 'All' 
+                                        : `${filters.selectedCurrencies?.length || 0} selected`}
+                                </span>
+                                <ChevronDown size={14} className="text-slate-400" />
+                            </button>
+                            
+                            {isCurrencyDropdownOpen && (
+                                <div className="absolute top-full left-0 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-50 max-h-48 overflow-y-auto">
+                                    {CURRENCIES.map(currency => {
+                                        const isSelected = filters.selectedCurrencies?.includes(currency);
+                                        return (
+                                            <div 
+                                                key={currency} 
+                                                onClick={() => toggleCurrency(currency)}
+                                                className={`flex items-center px-3 py-2 cursor-pointer hover:bg-slate-50 text-sm ${isSelected ? 'text-primary-700 bg-primary-50' : 'text-slate-700'}`}
+                                            >
+                                                <div className={`w-4 h-4 mr-2 rounded border flex items-center justify-center ${isSelected ? 'bg-primary-600 border-primary-600' : 'border-slate-300 bg-white'}`}>
+                                                    {isSelected && <Check size={10} className="text-white" />}
+                                                </div>
+                                                {currency === 'All' ? 'All' : currency}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
                         </div>
                     </div>
                   )}
@@ -239,7 +285,7 @@ const FilterBar: React.FC<FilterBarProps> = ({ filters, setFilters, searchTerm, 
                   {/* Symbol Multi-select for Positions & Closed */}
                   {(pageContext === 'positions' || pageContext === 'closed') && (
                     <div className="space-y-2" ref={symbolDropdownRef}>
-                        <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">交易品种</label>
+                        <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Trading Symbol</label>
                         <div className="relative">
                             <button 
                                 onClick={() => setIsSymbolDropdownOpen(!isSymbolDropdownOpen)}
@@ -247,8 +293,8 @@ const FilterBar: React.FC<FilterBarProps> = ({ filters, setFilters, searchTerm, 
                             >
                                 <span className="truncate">
                                     {filters.selectedSymbols?.includes('All') 
-                                        ? '全部' 
-                                        : `${filters.selectedSymbols?.length} 个已选`}
+                                        ? 'All' 
+                                        : `${filters.selectedSymbols?.length} selected`}
                                 </span>
                                 <ChevronDown size={14} className="text-slate-400" />
                             </button>
@@ -279,7 +325,7 @@ const FilterBar: React.FC<FilterBarProps> = ({ filters, setFilters, searchTerm, 
                   {/* Direction - For Positions & Closed */}
                   {(pageContext === 'positions' || pageContext === 'closed') && (
                         <div className="space-y-2">
-                            <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">交易方向</label>
+                            <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Trading Direction</label>
                             <div className="flex gap-2">
                                 {['All', 'Buy', 'Sell'].map(val => (
                                     <button
@@ -291,7 +337,7 @@ const FilterBar: React.FC<FilterBarProps> = ({ filters, setFilters, searchTerm, 
                                                 : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'
                                         }`}
                                     >
-                                        {val === 'All' ? '全部' : val === 'Buy' ? '买' : '卖'}
+                                        {val === 'All' ? 'All' : val === 'Buy' ? 'Buy' : 'Sell'}
                                     </button>
                                 ))}
                             </div>

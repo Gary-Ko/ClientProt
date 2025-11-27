@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import { FilterState, ClientRelation, CommissionStatus, CashFlowStatus, DateRangeOption, SettlementReport, PageContext, TransactionType } from './types';
+import { FilterState, ClientRelation, CommissionStatus, CashFlowStatus, DateRangeOption, SettlementReport, PageContext, TransactionType, WalletItem } from './types';
 import { MOCK_METRICS, MOCK_DETAILS, MOCK_SETTLEMENTS, MOCK_WALLETS_TOTAL, MOCK_WALLETS_SETTLED, MOCK_WALLETS_PENDING, MOCK_CLIENTS, MOCK_CASH_FLOW_METRICS, MOCK_CASH_FLOW_DATA, MOCK_POSITIONS_METRICS, MOCK_OPEN_POSITIONS, MOCK_CLOSED_METRICS, MOCK_CLOSED_POSITIONS } from './constants';
 import FilterBar from './components/FilterBar';
 import MetricsOverview from './components/MetricsOverview';
@@ -8,7 +8,7 @@ import ChartsSection from './components/ChartsSection';
 import DataTable from './components/DataTable';
 import WalletDrawer from './components/WalletDrawer';
 import CommissionDrawer from './components/CommissionDrawer';
-import { LayoutDashboard, WalletCards, CandlestickChart, History } from 'lucide-react';
+import { LayoutDashboard, WalletCards, CandlestickChart, History, FileText } from 'lucide-react';
 
 const App: React.FC = () => {
   // Page State
@@ -18,12 +18,14 @@ const App: React.FC = () => {
     relation: ClientRelation.ALL,
     symbol: 'All',
     selectedSymbols: ['All'],
+    selectedCurrencies: ['All'],
     status: CommissionStatus.ALL, // Initial status
     dateRange: DateRangeOption.THIS_MONTH
   });
 
   const [searchTerm, setSearchTerm] = useState('');
-  const [viewMode, setViewMode] = useState<'summary' | 'clients'>('summary');
+  const [viewMode, setViewMode] = useState<'clients' | 'details'>('clients');
+  const [clientNameFilter, setClientNameFilter] = useState<string>('');
   
   // State for Wallet Drawer
   const [walletDrawerType, setWalletDrawerType] = useState<'total' | 'settled' | 'pending' | null>(null);
@@ -38,9 +40,10 @@ const App: React.FC = () => {
       relation: ClientRelation.ALL,
       symbol: 'All',
       selectedSymbols: ['All'],
+      selectedCurrencies: ['All'],
       direction: 'All',
       status: page === 'commission' ? CommissionStatus.ALL : page === 'cashflow' ? CashFlowStatus.ALL : 'All',
-      dateRange: DateRangeOption.THIS_MONTH
+      dateRange: page === 'settlement' ? DateRangeOption.THIS_WEEK : DateRangeOption.THIS_MONTH
     });
     setSearchTerm('');
   };
@@ -63,14 +66,61 @@ const App: React.FC = () => {
     document.body.removeChild(link);
   };
 
-  // Filter Logic for Settlements (Commission View 1)
+  // Filter Logic for Settlements
   const filteredSettlements = useMemo(() => {
-    return MOCK_SETTLEMENTS.filter(s => {
-      const matchesSearch = s.settlementNo.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesStatus = filters.status === CommissionStatus.ALL || s.status === filters.status;
-      return matchesSearch && matchesStatus;
+    if (activePage === 'settlement') {
+      // For settlement page: filter by currency only
+      return MOCK_SETTLEMENTS.filter(s => {
+        const matchesSearch = s.settlementNo.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesCurrency = !filters.selectedCurrencies || filters.selectedCurrencies.includes('All') || filters.selectedCurrencies.includes(s.currency);
+        return matchesSearch && matchesCurrency;
+      });
+    } else {
+      // For commission page (if needed)
+      return MOCK_SETTLEMENTS.filter(s => {
+        const matchesSearch = s.settlementNo.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesStatus = filters.status === CommissionStatus.ALL || s.status === filters.status;
+        return matchesSearch && matchesStatus;
+      });
+    }
+  }, [activePage, searchTerm, filters]);
+
+  // Calculate Settlement Metrics from filtered data
+  const settlementMetrics = useMemo(() => {
+    if (activePage !== 'settlement') return null;
+    
+    // Calculate total estimated settled commission (sum of all amounts in USD)
+    const totalEstimated = filteredSettlements.reduce((sum, s) => sum + s.amount, 0);
+    
+    // Calculate currency breakdown (sum of originalAmount for each currency)
+    const currencyMap = new Map<string, number>();
+    filteredSettlements.forEach(s => {
+      const current = currencyMap.get(s.currency) || 0;
+      currencyMap.set(s.currency, current + s.originalAmount);
     });
-  }, [searchTerm, filters]);
+    
+    // Convert to WalletItem array with colors
+    const currencyBreakdown: WalletItem[] = Array.from(currencyMap.entries()).map(([currency, amount]) => {
+      const colors: Record<string, string> = {
+        'USD': 'bg-blue-100 text-blue-600',
+        'USDT': 'bg-emerald-100 text-emerald-600',
+        'EUR': 'bg-indigo-100 text-indigo-600',
+        'BTC': 'bg-orange-100 text-orange-600'
+      };
+      
+      return {
+        currency,
+        amount,
+        displayAmount: currency === 'BTC' ? `${(amount / 65000).toFixed(6)} BTC` : undefined,
+        color: colors[currency] || 'bg-slate-100 text-slate-600'
+      };
+    });
+    
+    return {
+      estimatedSettledCommission: totalEstimated,
+      currencyBreakdown
+    };
+  }, [activePage, filteredSettlements]);
 
   // Filter Logic for Clients (Commission View 2)
   const filteredClients = useMemo(() => {
@@ -82,7 +132,12 @@ const App: React.FC = () => {
       
       const matchesRelation = filters.relation === ClientRelation.ALL || c.identity === filters.relation;
       
-      return matchesSearch && matchesRelation;
+      // Currency filter
+      const matchesCurrency = !filters.selectedCurrencies || 
+        filters.selectedCurrencies.includes('All') || 
+        filters.selectedCurrencies.includes(c.currency);
+      
+      return matchesSearch && matchesRelation && matchesCurrency;
     });
   }, [searchTerm, filters]);
 
@@ -291,7 +346,18 @@ const App: React.FC = () => {
                         }`}
                     >
                         <History size={18} />
-                        已平仓
+                        Closed Positions
+                    </button>
+                    <button
+                        onClick={() => handlePageChange('settlement')}
+                        className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors flex items-center gap-2 ${
+                            activePage === 'settlement' 
+                            ? 'bg-slate-100 text-primary-700' 
+                            : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+                        }`}
+                    >
+                        <FileText size={18} />
+                        Settlement Report
                     </button>
                 </nav>
             </div>
@@ -330,6 +396,10 @@ const App: React.FC = () => {
               activePage === 'commission' ? MOCK_METRICS : 
               activePage === 'cashflow' ? (filteredCashFlowMetrics || MOCK_CASH_FLOW_METRICS) : 
               activePage === 'positions' ? MOCK_POSITIONS_METRICS :
+              activePage === 'settlement' ? (settlementMetrics || {
+                estimatedSettledCommission: 0,
+                currencyBreakdown: []
+              }) :
               (filteredClosedMetrics || MOCK_CLOSED_METRICS)
             } 
             pageContext={activePage}
@@ -337,31 +407,40 @@ const App: React.FC = () => {
             onSettledClick={() => setWalletDrawerType('settled')}
             onPendingClick={() => setWalletDrawerType('pending')}
             cashFlowData={activePage === 'cashflow' ? filteredCashFlow : undefined}
+            walletData={activePage === 'commission' ? {
+              total: MOCK_WALLETS_TOTAL,
+              settled: MOCK_WALLETS_SETTLED,
+              pending: MOCK_WALLETS_PENDING
+            } : undefined}
           />
         </section>
 
         {/* Section 3: Charts */}
-        <section>
-          <ChartsSection 
-            pageContext={activePage} 
-            cashFlowData={activePage === 'cashflow' ? filteredCashFlow : undefined}
-            openPositionsData={activePage === 'positions' ? filteredPositions : undefined}
-            closedPositionsData={activePage === 'closed' ? filteredClosed : undefined}
-          />
-        </section>
+        {activePage !== 'settlement' && (
+          <section>
+            <ChartsSection 
+              pageContext={activePage} 
+              cashFlowData={activePage === 'cashflow' ? filteredCashFlow : undefined}
+              openPositionsData={activePage === 'positions' ? filteredPositions : undefined}
+              closedPositionsData={activePage === 'closed' ? filteredClosed : undefined}
+            />
+          </section>
+        )}
 
         {/* Section 4: Data Table */}
         <section id="data-table-section">
           <DataTable 
             viewMode={viewMode} 
             setViewMode={setViewMode} 
-            settlementData={filteredSettlements}
+            settlementData={activePage === 'settlement' ? filteredSettlements : []}
             clientData={filteredClients}
             cashFlowData={filteredCashFlow}
             openPositionsData={filteredPositions}
             closedPositionsData={filteredClosed}
             onViewSettlement={(settlement) => setSelectedSettlement(settlement)}
             pageContext={activePage}
+            clientNameFilter={clientNameFilter}
+            setClientNameFilter={setClientNameFilter}
           />
         </section>
 

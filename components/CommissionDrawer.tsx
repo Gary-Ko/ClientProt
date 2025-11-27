@@ -45,9 +45,10 @@ const CommissionDrawer: React.FC<CommissionDrawerProps> = ({ isOpen, onClose, se
       const searchLower = searchTerm.toLowerCase();
       // Search matches Source, Order ID, or Account
       const matchesSearch = 
-        d.source.toLowerCase().includes(searchLower) ||
-        d.orderId.toLowerCase().includes(searchLower) ||
-        d.account.toLowerCase().includes(searchLower);
+        (d.sourceType || '').toLowerCase().includes(searchLower) ||
+        (d.orderId || '').toLowerCase().includes(searchLower) ||
+        (d.account || '').toLowerCase().includes(searchLower) ||
+        (d.clientName || '').toLowerCase().includes(searchLower);
       
       const matchesDirection = directionFilter === 'All' || d.direction === directionFilter;
       
@@ -185,7 +186,7 @@ const CommissionDrawer: React.FC<CommissionDrawerProps> = ({ isOpen, onClose, se
                         <tr key={row.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
                         <td className="px-4 py-3 font-medium text-slate-900 whitespace-nowrap">{row.orderId}</td>
                         <td className="px-4 py-3 whitespace-nowrap text-slate-700">
-                            {row.source}
+                            {row.sourceType === 'Direct' ? 'Direct' : 'Agent'}: {row.clientName}
                         </td>
                         <td className="px-4 py-3 font-medium whitespace-nowrap">{row.symbol}</td>
                         <td className="px-4 py-3 whitespace-nowrap">

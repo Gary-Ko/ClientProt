@@ -1,16 +1,17 @@
 
 import React, { useMemo } from 'react';
-import { MetricData, CashFlowMetrics, PageContext, PositionMetrics, CashFlowTransaction, TransactionType, ClosedMetrics } from '../types';
+import { MetricData, CashFlowMetrics, PageContext, PositionMetrics, CashFlowTransaction, TransactionType, ClosedMetrics, SettlementMetrics } from '../types';
 import { formatCurrency, formatNumber } from '../utils';
 import { DollarSign, Activity, Users, Wallet, Clock, ChevronRight, ArrowDownLeft, ArrowUpRight, BarChart4, Hourglass, Layers, TrendingUp, ArrowDownUp, Scale, FileText, TrendingDown } from 'lucide-react';
 
 interface MetricsOverviewProps {
-  metrics: MetricData | CashFlowMetrics | PositionMetrics | ClosedMetrics;
+  metrics: MetricData | CashFlowMetrics | PositionMetrics | ClosedMetrics | SettlementMetrics;
   pageContext: PageContext;
   onTotalClick: () => void;
   onSettledClick: () => void;
   onPendingClick: () => void;
-  cashFlowData?: CashFlowTransaction[]; // 用于计算货币明细
+  cashFlowData?: CashFlowTransaction[]; // For calculating currency breakdown
+  walletData?: { total?: any[]; settled?: any[]; pending?: any[] }; // For displaying commission breakdown
 }
 
 const MetricsOverview: React.FC<MetricsOverviewProps> = ({ 
@@ -19,10 +20,11 @@ const MetricsOverview: React.FC<MetricsOverviewProps> = ({
   onTotalClick,
   onSettledClick,
   onPendingClick,
-  cashFlowData = []
+  cashFlowData = [],
+  walletData
 }) => {
   
-  // 计算货币明细（按币种汇总）
+  // Calculate currency breakdown (grouped by currency)
   const currencyBreakdown = useMemo(() => {
     if (pageContext !== 'cashflow' || !cashFlowData.length) return { inflow: {}, outflow: {}, net: {} };
     
@@ -37,7 +39,7 @@ const MetricsOverview: React.FC<MetricsOverviewProps> = ({
       }
     });
     
-    // 计算净现金流
+    // Calculate net cash flow
     const net: Record<string, number> = {};
     const allCurrencies = new Set([...Object.keys(inflow), ...Object.keys(outflow)]);
     allCurrencies.forEach(currency => {
@@ -47,16 +49,41 @@ const MetricsOverview: React.FC<MetricsOverviewProps> = ({
     return { inflow, outflow, net };
   }, [pageContext, cashFlowData]);
   
+  // Render Settlement Report Metrics
+  if (pageContext === 'settlement') {
+    const settlementMetrics = metrics as SettlementMetrics;
+    return (
+      <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-100">
+        <div className="mb-6">
+          <p className="text-slate-500 text-sm font-medium mb-2">Estimated Settled Commission</p>
+          <h3 className="text-3xl font-bold text-emerald-600">
+            {formatCurrency(settlementMetrics.estimatedSettledCommission)}
+          </h3>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {settlementMetrics.currencyBreakdown.map((item) => (
+            <div key={item.currency} className={`p-4 rounded-lg ${item.color}`}>
+              <div className="text-xs font-medium mb-1 opacity-80">{item.currency}</div>
+              <div className="text-lg font-bold">
+                {item.displayAmount || formatNumber(item.amount)}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   // Render Closed Positions Metrics
   if (pageContext === 'closed') {
     const closedMetrics = metrics as ClosedMetrics;
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-             {/* 1. 总交易数 */}
+             {/* 1. Total Trades */}
              <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
                 <div className="flex justify-between items-start mb-4">
                     <div>
-                        <p className="text-slate-500 text-sm font-medium">总交易数</p>
+                        <p className="text-slate-500 text-sm font-medium">Total Trades</p>
                         <h3 className="text-2xl font-bold text-slate-800 mt-1">{formatNumber(closedMetrics.totalTrades)}</h3>
                     </div>
                     <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
@@ -66,11 +93,11 @@ const MetricsOverview: React.FC<MetricsOverviewProps> = ({
                 <div className="text-xs text-slate-400">Total trades</div>
             </div>
 
-            {/* 2. 总手数 */}
+            {/* 2. Total Lots */}
             <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
                 <div className="flex justify-between items-start mb-4">
                     <div>
-                        <p className="text-slate-500 text-sm font-medium">总手数</p>
+                        <p className="text-slate-500 text-sm font-medium">Total Lots</p>
                         <h3 className="text-2xl font-bold text-slate-800 mt-1">{formatNumber(closedMetrics.totalLots)} <span className="text-base font-normal text-slate-500">Lots</span></h3>
                     </div>
                     <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
@@ -80,11 +107,11 @@ const MetricsOverview: React.FC<MetricsOverviewProps> = ({
                 <div className="text-xs text-slate-400">Total lots</div>
             </div>
 
-            {/* 3. 净盈亏 */}
+            {/* 3. Net P/L */}
             <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
                 <div className="flex justify-between items-start mb-4">
                     <div>
-                        <p className="text-slate-500 text-sm font-medium">净盈亏</p>
+                        <p className="text-slate-500 text-sm font-medium">Net P/L</p>
                         <h3 className={`text-2xl font-bold mt-1 ${closedMetrics.netPL >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                             {formatCurrency(closedMetrics.netPL)}
                         </h3>
@@ -104,11 +131,11 @@ const MetricsOverview: React.FC<MetricsOverviewProps> = ({
     const posMetrics = metrics as PositionMetrics;
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
-             {/* 1. 总持仓手数 */}
+             {/* 1. Total Open Lots */}
              <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
                 <div className="flex justify-between items-start mb-4">
                     <div>
-                        <p className="text-slate-500 text-sm font-medium">总持仓手数</p>
+                        <p className="text-slate-500 text-sm font-medium">Total Open Lots</p>
                         <h3 className="text-2xl font-bold text-slate-800 mt-1">{formatNumber(posMetrics.totalOpenLots)} <span className="text-base font-normal text-slate-500">Lots</span></h3>
                     </div>
                     <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
@@ -118,11 +145,11 @@ const MetricsOverview: React.FC<MetricsOverviewProps> = ({
                 <div className="text-xs text-slate-400">Real-time exposure</div>
             </div>
 
-            {/* 2. 总持仓价值 */}
+            {/* 2. Total Position Value */}
             <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
                 <div className="flex justify-between items-start mb-4">
                     <div>
-                        <p className="text-slate-500 text-sm font-medium">总持仓价值</p>
+                        <p className="text-slate-500 text-sm font-medium">Total Position Value</p>
                         <h3 className="text-2xl font-bold text-slate-800 mt-1">{formatCurrency(posMetrics.totalPositionValue)}</h3>
                     </div>
                     <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
@@ -132,11 +159,11 @@ const MetricsOverview: React.FC<MetricsOverviewProps> = ({
                 <div className="text-xs text-slate-400">Total position value</div>
             </div>
 
-            {/* 3. 总浮动盈亏 */}
+            {/* 3. Total Floating P/L */}
             <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
                 <div className="flex justify-between items-start mb-4">
                     <div>
-                        <p className="text-slate-500 text-sm font-medium">总浮动盈亏</p>
+                        <p className="text-slate-500 text-sm font-medium">Total Floating P/L</p>
                         <h3 className={`text-2xl font-bold mt-1 ${posMetrics.totalFloatingPL >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                             {formatCurrency(posMetrics.totalFloatingPL)}
                         </h3>
@@ -148,11 +175,11 @@ const MetricsOverview: React.FC<MetricsOverviewProps> = ({
                 <div className="text-xs text-slate-400">Unrealized profit/loss</div>
             </div>
 
-            {/* 4. 平均持仓时长 */}
+            {/* 4. Average Holding Time */}
             <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
                 <div className="flex justify-between items-start mb-4">
                     <div>
-                        <p className="text-slate-500 text-sm font-medium">平均持仓时长</p>
+                        <p className="text-slate-500 text-sm font-medium">Average Holding Time</p>
                         <h3 className="text-2xl font-bold text-slate-800 mt-1">{posMetrics.avgHoldingTime}</h3>
                     </div>
                     <div className="p-2 bg-purple-50 text-purple-600 rounded-lg">
@@ -162,25 +189,25 @@ const MetricsOverview: React.FC<MetricsOverviewProps> = ({
                 <div className="text-xs text-slate-400">Duration of open trades</div>
             </div>
 
-            {/* 5. 净持仓 */}
+            {/* 5. Net Positions */}
             <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
                 <div className="flex items-center gap-2 mb-4">
                     <div className="p-2 bg-purple-50 text-purple-600 rounded-lg">
                         <Scale size={20} />
                     </div>
-                    <p className="text-slate-700 text-sm font-medium">净持仓</p>
+                    <p className="text-slate-700 text-sm font-medium">Net Positions</p>
                 </div>
                 <div className="flex items-center justify-between">
-                    {/* 左侧：主要方向 */}
+                    {/* Left: Main Direction */}
                     <div>
                         <h3 className={`text-3xl font-bold ${posMetrics.longLots >= posMetrics.shortLots ? 'text-emerald-600' : 'text-red-600'}`}>
-                            {posMetrics.longLots >= posMetrics.shortLots ? '多头' : '空头'}
+                            {posMetrics.longLots >= posMetrics.shortLots ? 'Long' : 'Short'}
                         </h3>
                     </div>
-                    {/* 右侧：多空数量 */}
+                    {/* Right: Long/Short Quantities */}
                     <div className="text-sm text-slate-600 text-right">
-                        <div>多头数量: <span className="font-semibold text-slate-800">{formatNumber(posMetrics.longLots)}</span></div>
-                        <div>空头数量: <span className="font-semibold text-slate-800">{formatNumber(posMetrics.shortLots)}</span></div>
+                        <div>Long: <span className="font-semibold text-slate-800">{formatNumber(posMetrics.longLots)}</span></div>
+                        <div>Short: <span className="font-semibold text-slate-800">{formatNumber(posMetrics.shortLots)}</span></div>
                     </div>
                 </div>
             </div>
@@ -197,7 +224,7 @@ const MetricsOverview: React.FC<MetricsOverviewProps> = ({
             <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow group relative">
                 <div className="flex justify-between items-start mb-4">
                     <div>
-                        <p className="text-slate-500 text-sm font-medium">预估 Total Inflow</p>
+                        <p className="text-slate-500 text-sm font-medium">Est. Total Inflow</p>
                         <h3 className="text-2xl font-bold text-emerald-600 mt-1">{formatCurrency(cfMetrics.totalInflow)}</h3>
                     </div>
                     <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg">
@@ -209,7 +236,7 @@ const MetricsOverview: React.FC<MetricsOverviewProps> = ({
                 {/* Currency Breakdown Tooltip */}
                 {Object.keys(currencyBreakdown.inflow).length > 0 && (
                     <div className="absolute bottom-full left-0 mb-2 w-64 p-3 bg-slate-800 text-white text-xs rounded-lg shadow-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
-                        <div className="font-semibold mb-2 text-sm">货币明细：</div>
+                        <div className="font-semibold mb-2 text-sm">Currency Breakdown:</div>
                         {Object.entries(currencyBreakdown.inflow).map(([currency, amount]) => (
                             <div key={currency} className="flex justify-between items-center mb-1">
                                 <span>{currency}:</span>
@@ -225,7 +252,7 @@ const MetricsOverview: React.FC<MetricsOverviewProps> = ({
             <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow group relative">
                 <div className="flex justify-between items-start mb-4">
                     <div>
-                        <p className="text-slate-500 text-sm font-medium">预估 Total Outflow</p>
+                        <p className="text-slate-500 text-sm font-medium">Est. Total Outflow</p>
                         <h3 className="text-2xl font-bold text-red-600 mt-1">{formatCurrency(cfMetrics.totalOutflow)}</h3>
                     </div>
                     <div className="p-2 bg-red-50 text-red-600 rounded-lg">
@@ -237,7 +264,7 @@ const MetricsOverview: React.FC<MetricsOverviewProps> = ({
                 {/* Currency Breakdown Tooltip */}
                 {Object.keys(currencyBreakdown.outflow).length > 0 && (
                     <div className="absolute bottom-full left-0 mb-2 w-64 p-3 bg-slate-800 text-white text-xs rounded-lg shadow-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
-                        <div className="font-semibold mb-2 text-sm">货币明细：</div>
+                        <div className="font-semibold mb-2 text-sm">Currency Breakdown:</div>
                         {Object.entries(currencyBreakdown.outflow).map(([currency, amount]) => (
                             <div key={currency} className="flex justify-between items-center mb-1">
                                 <span>{currency}:</span>
@@ -253,7 +280,7 @@ const MetricsOverview: React.FC<MetricsOverviewProps> = ({
             <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow group relative">
                 <div className="flex justify-between items-start mb-4">
                     <div>
-                        <p className="text-slate-500 text-sm font-medium">预估 Net Cash Flow</p>
+                        <p className="text-slate-500 text-sm font-medium">Est. Net Cash Flow</p>
                         <h3 className={`text-2xl font-bold mt-1 ${cfMetrics.netCashFlow >= 0 ? 'text-slate-800' : 'text-slate-600'}`}>
                             {formatCurrency(cfMetrics.netCashFlow)}
                         </h3>
@@ -267,7 +294,7 @@ const MetricsOverview: React.FC<MetricsOverviewProps> = ({
                 {/* Currency Breakdown Tooltip */}
                 {Object.keys(currencyBreakdown.net).length > 0 && (
                     <div className="absolute bottom-full left-0 mb-2 w-64 p-3 bg-slate-800 text-white text-xs rounded-lg shadow-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
-                        <div className="font-semibold mb-2 text-sm">货币明细：</div>
+                        <div className="font-semibold mb-2 text-sm">Currency Breakdown:</div>
                         {Object.entries(currencyBreakdown.net).map(([currency, amount]) => (
                             <div key={currency} className="flex justify-between items-center mb-1">
                                 <span>{currency}:</span>
@@ -288,73 +315,103 @@ const MetricsOverview: React.FC<MetricsOverviewProps> = ({
   const comMetrics = metrics as MetricData;
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-      {/* Metric 1: Est. Total Commission (Clickable) */}
-      <div 
-        onClick={onTotalClick}
-        className="bg-white p-5 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-all cursor-pointer group relative overflow-hidden"
-      >
-        <div className="absolute top-0 right-0 p-2 opacity-0 group-hover:opacity-100 transition-opacity">
-          <ChevronRight className="text-slate-300" size={20} />
-        </div>
+      {/* Metric 1: Est. Total Commission (Hover Tooltip) */}
+      <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow group relative">
         <div className="flex justify-between items-start mb-4">
           <div>
             <p className="text-slate-500 text-sm font-medium">Est. Total Commission</p>
-            <h3 className="text-2xl font-bold text-slate-800 mt-1 group-hover:text-primary-600 transition-colors">
+            <h3 className="text-2xl font-bold text-slate-800 mt-1">
               {formatCurrency(comMetrics.totalCommission)}
             </h3>
           </div>
-          <div className="p-2 bg-blue-50 text-blue-600 rounded-lg group-hover:bg-blue-100 transition-colors">
+          <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
             <DollarSign size={20} />
           </div>
         </div>
         <div className="text-xs text-slate-500 flex items-center gap-1">
-          <span className="bg-slate-100 px-1.5 py-0.5 rounded text-slate-600 font-medium group-hover:bg-slate-200">History</span>
+          <span className="bg-slate-100 px-1.5 py-0.5 rounded text-slate-600 font-medium">History</span>
           <span>Total: {formatCurrency(comMetrics.historicalTotal)}</span>
         </div>
+        
+        {/* Currency Breakdown Tooltip */}
+        {walletData?.total && walletData.total.length > 0 && (
+          <div className="absolute bottom-full left-0 mb-2 w-64 p-3 bg-slate-800 text-white text-xs rounded-lg shadow-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+            <div className="font-semibold mb-2 text-sm">Currency Breakdown:</div>
+            {walletData.total.map((item: any) => (
+              <div key={item.currency} className="flex justify-between items-center mb-1">
+                <span>{item.currency}:</span>
+                <span className="font-medium">
+                  {item.displayAmount || formatNumber(item.amount)}
+                </span>
+              </div>
+            ))}
+            <div className="absolute top-full left-4 -mt-1 border-4 border-transparent border-t-slate-800"></div>
+          </div>
+        )}
       </div>
 
-      {/* Metric 2: Est. Settled Commission (Clickable) */}
-      <div 
-        onClick={onSettledClick}
-        className="bg-white p-5 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-all cursor-pointer group relative overflow-hidden"
-      >
-        <div className="absolute top-0 right-0 p-2 opacity-0 group-hover:opacity-100 transition-opacity">
-          <ChevronRight className="text-slate-300" size={20} />
-        </div>
+      {/* Metric 2: Est. Settled Commission (Hover Tooltip) */}
+      <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow group relative">
         <div className="flex justify-between items-start mb-4">
           <div>
             <p className="text-slate-500 text-sm font-medium">Est. Settled Commission</p>
             <h3 className="text-2xl font-bold text-emerald-600 mt-1">{formatCurrency(comMetrics.settledAmount)}</h3>
           </div>
-          <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg group-hover:bg-emerald-100 transition-colors">
+          <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg">
             <Wallet size={20} />
           </div>
         </div>
         <div className="text-xs text-slate-400 mt-1">
           Available for withdrawal
         </div>
+        
+        {/* Currency Breakdown Tooltip */}
+        {walletData?.settled && walletData.settled.length > 0 && (
+          <div className="absolute bottom-full left-0 mb-2 w-64 p-3 bg-slate-800 text-white text-xs rounded-lg shadow-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+            <div className="font-semibold mb-2 text-sm">Currency Breakdown:</div>
+            {walletData.settled.map((item: any) => (
+              <div key={item.currency} className="flex justify-between items-center mb-1">
+                <span>{item.currency}:</span>
+                <span className="font-medium">
+                  {item.displayAmount || formatNumber(item.amount)}
+                </span>
+              </div>
+            ))}
+            <div className="absolute top-full left-4 -mt-1 border-4 border-transparent border-t-slate-800"></div>
+          </div>
+        )}
       </div>
 
-      {/* Metric 3: Est. Pending Commission (Clickable) */}
-      <div 
-        onClick={onPendingClick}
-        className="bg-white p-5 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-all cursor-pointer group relative overflow-hidden"
-      >
-        <div className="absolute top-0 right-0 p-2 opacity-0 group-hover:opacity-100 transition-opacity">
-          <ChevronRight className="text-slate-300" size={20} />
-        </div>
+      {/* Metric 3: Est. Pending Commission (Hover Tooltip) */}
+      <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow group relative">
         <div className="flex justify-between items-start mb-4">
           <div>
             <p className="text-slate-500 text-sm font-medium">Est. Pending Commission</p>
             <h3 className="text-2xl font-bold text-amber-500 mt-1">{formatCurrency(comMetrics.pendingAmount)}</h3>
           </div>
-          <div className="p-2 bg-amber-50 text-amber-500 rounded-lg group-hover:bg-amber-100 transition-colors">
+          <div className="p-2 bg-amber-50 text-amber-500 rounded-lg">
             <Clock size={20} />
           </div>
         </div>
         <div className="text-xs text-slate-400 mt-1">
           Waiting for settlement
         </div>
+        
+        {/* Currency Breakdown Tooltip */}
+        {walletData?.pending && walletData.pending.length > 0 && (
+          <div className="absolute bottom-full left-0 mb-2 w-64 p-3 bg-slate-800 text-white text-xs rounded-lg shadow-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+            <div className="font-semibold mb-2 text-sm">Currency Breakdown:</div>
+            {walletData.pending.map((item: any) => (
+              <div key={item.currency} className="flex justify-between items-center mb-1">
+                <span>{item.currency}:</span>
+                <span className="font-medium">
+                  {item.displayAmount || formatNumber(item.amount)}
+                </span>
+              </div>
+            ))}
+            <div className="absolute top-full left-4 -mt-1 border-4 border-transparent border-t-slate-800"></div>
+          </div>
+        )}
       </div>
 
       {/* Metric 4: Volume & Activity */}

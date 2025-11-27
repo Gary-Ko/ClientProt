@@ -8,13 +8,21 @@ export enum ClientRelation {
 export enum CommissionStatus {
   ALL = 'All',
   SETTLED = 'Settled',
-  PENDING = 'Pending'
+  PENDING = 'Pending',
+  FAILED = 'Failed'
 }
 
 export enum CashFlowStatus {
   ALL = 'All',
   SUCCESS = 'Success',
   PENDING = 'Processing',
+  FAILED = 'Failed'
+}
+
+export enum CommissionStatus {
+  ALL = 'All',
+  SETTLED = 'Settled',
+  PENDING = 'Pending',
   FAILED = 'Failed'
 }
 
@@ -31,7 +39,7 @@ export enum DateRangeOption {
   CUSTOM = 'Custom'
 }
 
-export type PageContext = 'commission' | 'cashflow' | 'positions' | 'closed';
+export type PageContext = 'commission' | 'cashflow' | 'positions' | 'closed' | 'settlement';
 
 export interface ClientSummary {
   clientId: string;
@@ -39,8 +47,14 @@ export interface ClientSummary {
   identity: 'Direct' | 'Agent';
   relatedInfo?: string; 
   tradingVolume: number;
+  tradingLots: number; // 交易手数
+  orderCount: number; // 交易订单数
   netProfitLoss: number;
-  contributedCommission: number;
+  contributedCommission: number; // 预估佣金（USD）
+  originalCommission: number; // 实际佣金（原始货币）
+  currency: string; // 币种
+  settledAmount: number; // 已结算
+  pendingAmount: number; // 待结算
   commissionPercentage: number;
 }
 
@@ -62,18 +76,20 @@ export interface SettlementReport {
 export interface CommissionDetail {
   id: string;
   orderId: string;
-  source: string;
+  clientName: string;
+  sourceType: 'Direct' | 'Agent';
   account: string;
-  symbol: string;
-  direction: 'Buy' | 'Sell';
-  lots: number;
-  rate: number; 
-  amount: number; 
-  status: 'Settled' | 'Pending';
   openTime: string;
-  holdTime: string;
   closeTime: string;
+  direction: 'Buy' | 'Sell';
+  symbol: string;
+  lots: number;
+  rate: number; // 返佣标准
+  amount: number; // 佣金金额
+  currency: string; // 币种
+  status: 'Settled' | 'Pending';
   settleTime: string | null;
+  comment?: string; // 结算备注
 }
 
 export interface CashFlowTransaction {
@@ -118,6 +134,7 @@ export interface FilterState {
   relation: ClientRelation;
   symbol: string; // Single select for Commission Page
   selectedSymbols: string[]; // Multi-select for Positions Page
+  selectedCurrencies?: string[]; // Multi-select for Commission Page currencies
   direction?: string; // New: For Positions page
   status: string; 
   dateRange: DateRangeOption;

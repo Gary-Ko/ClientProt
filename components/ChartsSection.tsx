@@ -11,9 +11,9 @@ import { formatCurrency, formatNumber } from '../utils';
 
 interface ChartsSectionProps {
   pageContext: PageContext;
-  cashFlowData?: CashFlowTransaction[]; // 筛选后的资金流水数据
-  openPositionsData?: any[]; // 筛选后的持仓数据
-  closedPositionsData?: any[]; // 筛选后的已平仓数据
+  cashFlowData?: CashFlowTransaction[]; // Filtered cash flow data
+  openPositionsData?: any[]; // Filtered open positions data
+  closedPositionsData?: any[]; // Filtered closed positions data
 }
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444'];
@@ -148,7 +148,7 @@ const ChartsSection: React.FC<ChartsSectionProps> = ({ pageContext, cashFlowData
           lots: pos.lots,
           orders: 1,
           pl: pos.floatingPL,
-          relation: pos.sourceType === 'Direct' ? '直客' : '代理'
+          relation: pos.sourceType === 'Direct' ? 'Direct' : 'Agent'
         });
       }
     });
@@ -189,7 +189,7 @@ const ChartsSection: React.FC<ChartsSectionProps> = ({ pageContext, cashFlowData
     
     const result = top5.map(item => ({ name: item.name, value: item.lots }));
     if (others > 0) {
-      result.push({ name: '其他', value: others });
+      result.push({ name: 'Other', value: others });
     }
     
     return result;
@@ -198,14 +198,14 @@ const ChartsSection: React.FC<ChartsSectionProps> = ({ pageContext, cashFlowData
   if (pageContext === 'positions' || pageContext === 'closed') {
       return (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-             {/* Chart 1: 客户排行 */}
+             {/* Chart 1: Client Ranking */}
             <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-100">
                 <div className="flex justify-between items-center mb-6">
                     <h3 className="font-semibold text-slate-800 flex items-center gap-2">
                         <CandlestickChart size={18} className="text-slate-400" />
-                        客户排行
+                        Client Ranking
                     </h3>
-                    {/* 筛选维度 */}
+                    {/* Filter Dimension */}
                     <div className="flex bg-slate-100 p-1 rounded-lg">
                         <button
                             onClick={() => setPosRankingType('lots')}
@@ -215,7 +215,7 @@ const ChartsSection: React.FC<ChartsSectionProps> = ({ pageContext, cashFlowData
                                 : 'text-slate-500 hover:text-slate-700'
                             }`}
                         >
-                            手数
+                            Lots
                         </button>
                         <button
                             onClick={() => setPosRankingType('orders')}
@@ -225,7 +225,7 @@ const ChartsSection: React.FC<ChartsSectionProps> = ({ pageContext, cashFlowData
                                 : 'text-slate-500 hover:text-slate-700'
                             }`}
                         >
-                            交易订单数
+                            Number of Trades
                         </button>
                         <button
                             onClick={() => setPosRankingType('pl')}
@@ -235,7 +235,7 @@ const ChartsSection: React.FC<ChartsSectionProps> = ({ pageContext, cashFlowData
                                 : 'text-slate-500 hover:text-slate-700'
                             }`}
                         >
-                            浮动盈亏
+                            Floating P/L
                         </button>
                     </div>
                 </div>
@@ -272,9 +272,9 @@ const ChartsSection: React.FC<ChartsSectionProps> = ({ pageContext, cashFlowData
                                     if (active && payload && payload.length) {
                                         const data = payload[0].payload;
                                         const labelMap: Record<string, string> = {
-                                          lots: '手数',
-                                          orders: '交易订单数',
-                                          pl: '浮动盈亏'
+                                          lots: 'Lots',
+                                          orders: 'Number of Trades',
+                                          pl: 'Floating P/L'
                                         };
                                         const valueDisplay = posRankingType === 'pl' 
                                           ? formatCurrency(data.value)
@@ -284,7 +284,7 @@ const ChartsSection: React.FC<ChartsSectionProps> = ({ pageContext, cashFlowData
                                         return (
                                             <div className="bg-white p-3 rounded-lg shadow-lg border border-slate-100">
                                                 <p className="font-medium text-slate-800 mb-1">{data.name}</p>
-                                                <div className="text-xs text-slate-500 mb-2">客户关系: <span className="font-medium text-slate-700">{data.relation}</span></div>
+                                                <div className="text-xs text-slate-500 mb-2">Client Relation: <span className="font-medium text-slate-700">{data.relation}</span></div>
                                                 <div className="text-sm font-bold text-primary-600">
                                                     {valueDisplay} {labelMap[posRankingType]}
                                                 </div>
@@ -305,12 +305,12 @@ const ChartsSection: React.FC<ChartsSectionProps> = ({ pageContext, cashFlowData
                 </div>
             </div>
 
-            {/* Chart 2: 产品种类占比 */}
+            {/* Chart 2: Product Type Distribution */}
             <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-100">
                 <div className="flex justify-between items-center mb-6">
                     <h3 className="font-semibold text-slate-800 flex items-center gap-2">
                         <PieChartIcon size={18} className="text-slate-400" />
-                        产品种类占比
+                        Product Type Distribution
                     </h3>
                 </div>
                 <div className="h-[300px] w-full">
@@ -341,7 +341,7 @@ const ChartsSection: React.FC<ChartsSectionProps> = ({ pageContext, cashFlowData
                                                     <div className="w-2 h-2 rounded-full" style={{ backgroundColor: payload[0].color }}></div>
                                                     <span className="font-medium text-slate-800">{data.name}</span>
                                                 </div>
-                                                <div className="text-xs text-slate-500 mb-1">手数: <span className="font-medium text-slate-700">{data.value.toLocaleString()}</span></div>
+                                                <div className="text-xs text-slate-500 mb-1">Lots: <span className="font-medium text-slate-700">{data.value.toLocaleString()}</span></div>
                                                 <div className="text-sm font-bold text-slate-900">{percent}%</div>
                                             </div>
                                         );
@@ -361,12 +361,12 @@ const ChartsSection: React.FC<ChartsSectionProps> = ({ pageContext, cashFlowData
   if (pageContext === 'cashflow') {
     return (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-             {/* Chart 1: 出入金排行 */}
+             {/* Chart 1: Deposit/Withdrawal Ranking */}
             <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-100">
                 <div className="flex justify-between items-center mb-6">
                     <h3 className="font-semibold text-slate-800 flex items-center gap-2">
                         <TrendingUp size={18} className="text-slate-400" />
-                        出入金排行
+                        Deposit/Withdrawal Ranking
                     </h3>
                     {/* Toggle Button */}
                     <div className="flex bg-slate-100 p-1 rounded-lg">
@@ -379,7 +379,7 @@ const ChartsSection: React.FC<ChartsSectionProps> = ({ pageContext, cashFlowData
                             }`}
                         >
                             <ArrowDownCircle size={14} />
-                            入金
+                            Deposit
                         </button>
                         <button
                             onClick={() => setCfRankingType('withdrawal')}
@@ -390,7 +390,7 @@ const ChartsSection: React.FC<ChartsSectionProps> = ({ pageContext, cashFlowData
                             }`}
                         >
                             <ArrowUpCircle size={14} />
-                            出金
+                            Withdrawal
                         </button>
                     </div>
                 </div>
@@ -409,7 +409,7 @@ const ChartsSection: React.FC<ChartsSectionProps> = ({ pageContext, cashFlowData
                                         return (
                                             <div className="bg-white p-3 rounded-lg shadow-lg border border-slate-100">
                                                 <p className="font-medium text-slate-800 mb-1">{data.name}</p>
-                                                <div className="text-xs text-slate-500 mb-2">客户关系: <span className="font-medium text-slate-700">{data.relation === 'Direct' ? '直客' : '代理'}</span></div>
+                                                <div className="text-xs text-slate-500 mb-2">Client Relation: <span className="font-medium text-slate-700">{data.relation === 'Direct' ? 'Direct' : 'Agent'}</span></div>
                                                 <div className={`text-sm font-bold ${cfRankingType === 'deposit' ? 'text-emerald-600' : 'text-red-600'}`}>
                                                     ${data.value.toLocaleString()}
                                                 </div>
@@ -539,15 +539,29 @@ const ChartsSection: React.FC<ChartsSectionProps> = ({ pageContext, cashFlowData
         <div className="h-[300px] w-full">
           <ResponsiveContainer width="100%" height="100%">
             {chartType === 'ranking' ? (
-              <BarChart data={rankingData} layout="vertical" margin={{ left: 20 }}>
-                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
-                <XAxis type="number" hide />
-                <YAxis dataKey="name" type="category" width={100} tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
+              <BarChart data={rankingData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                <XAxis 
+                  dataKey="name" 
+                  tick={{ fontSize: 12, fill: '#64748b' }} 
+                  axisLine={false} 
+                  tickLine={false}
+                  angle={-45}
+                  textAnchor="end"
+                  height={80}
+                />
+                <YAxis 
+                  tick={{ fontSize: 12, fill: '#64748b' }} 
+                  axisLine={false} 
+                  tickLine={false}
+                  tickFormatter={(value) => formatCurrency(value)}
+                />
                 <Tooltip 
                   cursor={{ fill: '#f1f5f9' }}
                   contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                  formatter={(value: number) => formatCurrency(value)}
                 />
-                <Bar dataKey="value" fill="#3b82f6" radius={[0, 4, 4, 0]} barSize={20} />
+                <Bar dataKey="value" fill="#3b82f6" radius={[4, 4, 0, 0]} />
               </BarChart>
             ) : (
               <PieChart>

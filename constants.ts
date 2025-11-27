@@ -2,6 +2,7 @@
 import { ClientSummary, CommissionDetail, MetricData, SettlementReport, WalletItem, CashFlowMetrics, CashFlowTransaction, TransactionType, CashFlowStatus, PositionMetrics, OpenPosition, ClosedPosition, ClosedMetrics } from './types';
 
 export const TRADING_SYMBOLS = ['All', 'EURUSD', 'GBPUSD', 'XAUUSD', 'BTCUSD', 'US30'];
+export const CURRENCIES = ['All', 'USD', 'USDT', 'EUR', 'BTC'];
 
 export const MOCK_METRICS: MetricData = {
   totalCommission: 125430.50,
@@ -61,22 +62,8 @@ export const MOCK_WALLETS_PENDING: WalletItem[] = [
   { currency: 'BTC', amount: 2049.75, displayAmount: '0.030 BTC', color: 'bg-orange-100 text-orange-600' },
 ];
 
-export const MOCK_CLIENTS: ClientSummary[] = Array.from({ length: 30 }).map((_, i) => {
-  const isAgent = i % 3 === 0;
-  const contribution = Math.floor(Math.random() * 5000) + 100;
-  const totalCommission = MOCK_METRICS.totalCommission;
-  
-  return {
-    clientId: `C-${2000 + i}`,
-    clientName: isAgent ? `Li Si ${i}` : `Zhang San ${i}`,
-    identity: (isAgent ? 'Agent' : 'Direct') as 'Agent' | 'Direct',
-    relatedInfo: isAgent && i % 2 === 0 ? `Order No. 3223${40 + i}` : undefined,
-    tradingVolume: Number((Math.random() * 500 + 10).toFixed(2)),
-    netProfitLoss: Number(((Math.random() * 4000) - 1000).toFixed(2)),
-    contributedCommission: contribution,
-    commissionPercentage: Number(((contribution / totalCommission) * 100).toFixed(2))
-  };
-}).sort((a, b) => b.contributedCommission - a.contributedCommission);
+// MOCK_CLIENTS will be defined after MOCK_DETAILS
+export const MOCK_CLIENTS: ClientSummary[] = [];
 
 export const MOCK_SETTLEMENTS: SettlementReport[] = Array.from({ length: 20 }).map((_, i) => {
   const isPending = i % 5 === 0;
@@ -187,27 +174,103 @@ export const MOCK_OPEN_POSITIONS: OpenPosition[] = Array.from({ length: 25 }).ma
 
 export const MOCK_DETAILS: CommissionDetail[] = Array.from({ length: 50 }).map((_, i) => {
   const isAgent = i % 3 === 0;
-  const type = isAgent ? 'Agent' : 'Direct';
-  const name = isAgent ? `Li Si ${i}` : `Zhang San ${i}`;
-  const extraInfo = isAgent && i % 2 === 0 ? `(3223${40 + i})` : '';
+  const name = isAgent ? `Li Si ${Math.floor(i / 3)}` : `Zhang San ${i}`;
+  const currencies = ['USD', 'USDT', 'EUR', 'BTC'];
+  const currency = currencies[i % currencies.length];
 
   return {
     id: `TRX-${i}`,
     orderId: `ORD-${8000 + i}`,
-    source: `${type}: ${name}${extraInfo ? ' ' + extraInfo : ''}`,
+    clientName: name,
+    sourceType: (isAgent ? 'Agent' : 'Direct') as 'Direct' | 'Agent',
     account: `MT4-${5000 + i}`,
+    openTime: `2023-11-${String(1 + (i % 28)).padStart(2, '0')} 10:00:00`,
+    closeTime: `2023-11-${String(1 + (i % 28)).padStart(2, '0')} 12:30:00`,
     symbol: TRADING_SYMBOLS[1 + (i % 5)],
     direction: (i % 2 === 0 ? 'Buy' : 'Sell') as 'Buy' | 'Sell',
     lots: Number((Math.random() * 5).toFixed(2)),
-    rate: 10,
+    rate: Number((Math.random() * 20 + 5).toFixed(2)),
     amount: Number((Math.random() * 50).toFixed(2)),
+    currency: currency,
     status: i % 10 === 0 ? 'Pending' : 'Settled',
-    openTime: `2023-11-${String(1 + (i % 28)).padStart(2, '0')} 10:00:00`,
-    holdTime: '2h 30m',
-    closeTime: `2023-11-${String(1 + (i % 28)).padStart(2, '0')} 12:30:00`,
-    settleTime: `2023-11-${String(2 + (i % 28)).padStart(2, '0')} 02:00:00`
+    settleTime: i % 10 === 0 ? null : `2023-11-${String(2 + (i % 28)).padStart(2, '0')} 02:00:00`,
+    comment: i % 5 === 0 ? '正常结算' : undefined
   };
 });
+
+// Calculate trading lots and order count from MOCK_DETAILS for each client
+const calculateClientStats = (details: typeof MOCK_DETAILS) => {
+  const clientStatsMap = new Map<string, { lots: number; orderCount: number }>();
+  
+  details.forEach(detail => {
+    const existing = clientStatsMap.get(detail.clientName);
+    if (existing) {
+      existing.lots += detail.lots;
+      existing.orderCount += 1;
+    } else {
+      clientStatsMap.set(detail.clientName, {
+        lots: detail.lots,
+        orderCount: 1
+      });
+    }
+  });
+  
+  return clientStatsMap;
+};
+
+// Calculate client stats from MOCK_DETAILS
+const clientStatsMap = calculateClientStats(MOCK_DETAILS);
+
+// Helper function to convert commission to USD based on currency
+const convertToUSD = (amount: number, currency: string): number => {
+  if (currency === 'EUR') return amount * 1.08;
+  if (currency === 'BTC') return amount * 65000; // Mock rate
+  if (currency === 'USDT') return amount; // USDT is pegged to USD
+  return amount; // USD and others
+};
+
+// Now define MOCK_CLIENTS with calculated stats
+const clientsArray: ClientSummary[] = Array.from({ length: 30 }).map((_, i) => {
+  const isAgent = i % 3 === 0;
+  const clientName = isAgent ? `Li Si ${Math.floor(i / 3)}` : `Zhang San ${i}`;
+  const currencies = ['USD', 'USDT', 'EUR', 'BTC'];
+  const currency = currencies[i % currencies.length];
+  
+  // 先确定实际佣金（原始货币）
+  const originalCommission = Number((Math.random() * 5000 + 100).toFixed(2));
+  
+  // 根据币种换算成预估佣金（美元）
+  const contributedCommission = convertToUSD(originalCommission, currency);
+  
+  const totalCommission = MOCK_METRICS.totalCommission;
+  const settledAmount = contributedCommission * 0.7; // 已结算70%（美元）
+  const pendingAmount = contributedCommission * 0.3; // 待结算30%（美元）
+  
+  // Get stats from MOCK_DETAILS, or use default values if not found
+  const stats = clientStatsMap.get(clientName) || { lots: 0, orderCount: 0 };
+  const tradingLots = stats.lots > 0 ? Number(stats.lots.toFixed(2)) : Number((Math.random() * 500 + 10).toFixed(2));
+  const orderCount = stats.orderCount > 0 ? stats.orderCount : Math.floor(Math.random() * 200 + 10);
+  
+  return {
+    clientId: `C-${2000 + i}`,
+    clientName: clientName,
+    identity: (isAgent ? 'Agent' : 'Direct') as 'Agent' | 'Direct',
+    relatedInfo: isAgent && i % 2 === 0 ? `Order No. 3223${40 + i}` : undefined,
+    tradingVolume: Number((Math.random() * 500 + 10).toFixed(2)),
+    tradingLots: tradingLots,
+    orderCount: orderCount,
+    netProfitLoss: Number(((Math.random() * 4000) - 1000).toFixed(2)),
+    contributedCommission: Number(contributedCommission.toFixed(2)), // 预估佣金（美元）
+    originalCommission: originalCommission, // 实际佣金（原始货币）
+    currency: currency,
+    settledAmount: Number(settledAmount.toFixed(2)),
+    pendingAmount: Number(pendingAmount.toFixed(2)),
+    commissionPercentage: Number(((contributedCommission / totalCommission) * 100).toFixed(2))
+  };
+}).sort((a, b) => b.contributedCommission - a.contributedCommission);
+
+// Assign to MOCK_CLIENTS
+MOCK_CLIENTS.push(...clientsArray);
 
 export const CHART_TREND_DATA = [
   { date: 'Mon', value: 4000 },
