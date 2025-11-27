@@ -1,11 +1,11 @@
 
 import React, { useMemo } from 'react';
-import { MetricData, CashFlowMetrics, PageContext, PositionMetrics, CashFlowTransaction, TransactionType } from '../types';
+import { MetricData, CashFlowMetrics, PageContext, PositionMetrics, CashFlowTransaction, TransactionType, ClosedMetrics } from '../types';
 import { formatCurrency, formatNumber } from '../utils';
-import { DollarSign, Activity, Users, Wallet, Clock, ChevronRight, ArrowDownLeft, ArrowUpRight, BarChart4, Hourglass, Layers, TrendingUp } from 'lucide-react';
+import { DollarSign, Activity, Users, Wallet, Clock, ChevronRight, ArrowDownLeft, ArrowUpRight, BarChart4, Hourglass, Layers, TrendingUp, ArrowDownUp, Scale, FileText, TrendingDown } from 'lucide-react';
 
 interface MetricsOverviewProps {
-  metrics: MetricData | CashFlowMetrics | PositionMetrics;
+  metrics: MetricData | CashFlowMetrics | PositionMetrics | ClosedMetrics;
   pageContext: PageContext;
   onTotalClick: () => void;
   onSettledClick: () => void;
@@ -47,16 +47,68 @@ const MetricsOverview: React.FC<MetricsOverviewProps> = ({
     return { inflow, outflow, net };
   }, [pageContext, cashFlowData]);
   
+  // Render Closed Positions Metrics
+  if (pageContext === 'closed') {
+    const closedMetrics = metrics as ClosedMetrics;
+    return (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+             {/* 1. 总交易数 */}
+             <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
+                <div className="flex justify-between items-start mb-4">
+                    <div>
+                        <p className="text-slate-500 text-sm font-medium">总交易数</p>
+                        <h3 className="text-2xl font-bold text-slate-800 mt-1">{formatNumber(closedMetrics.totalTrades)}</h3>
+                    </div>
+                    <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
+                        <FileText size={20} />
+                    </div>
+                </div>
+                <div className="text-xs text-slate-400">Total trades</div>
+            </div>
+
+            {/* 2. 总手数 */}
+            <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
+                <div className="flex justify-between items-start mb-4">
+                    <div>
+                        <p className="text-slate-500 text-sm font-medium">总手数</p>
+                        <h3 className="text-2xl font-bold text-slate-800 mt-1">{formatNumber(closedMetrics.totalLots)} <span className="text-base font-normal text-slate-500">Lots</span></h3>
+                    </div>
+                    <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
+                        <Layers size={20} />
+                    </div>
+                </div>
+                <div className="text-xs text-slate-400">Total lots</div>
+            </div>
+
+            {/* 3. 净盈亏 */}
+            <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
+                <div className="flex justify-between items-start mb-4">
+                    <div>
+                        <p className="text-slate-500 text-sm font-medium">净盈亏</p>
+                        <h3 className={`text-2xl font-bold mt-1 ${closedMetrics.netPL >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                            {formatCurrency(closedMetrics.netPL)}
+                        </h3>
+                    </div>
+                    <div className={`p-2 rounded-lg ${closedMetrics.netPL >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
+                        <BarChart4 size={20} />
+                    </div>
+                </div>
+                <div className="text-xs text-slate-400">Net P/L</div>
+            </div>
+        </div>
+    );
+  }
+
   // Render Open Positions Metrics
   if (pageContext === 'positions') {
     const posMetrics = metrics as PositionMetrics;
     return (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-             {/* 1. Total Open Lots */}
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
+             {/* 1. 总持仓手数 */}
              <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
                 <div className="flex justify-between items-start mb-4">
                     <div>
-                        <p className="text-slate-500 text-sm font-medium">Total Open Lots</p>
+                        <p className="text-slate-500 text-sm font-medium">总持仓手数</p>
                         <h3 className="text-2xl font-bold text-slate-800 mt-1">{formatNumber(posMetrics.totalOpenLots)} <span className="text-base font-normal text-slate-500">Lots</span></h3>
                     </div>
                     <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
@@ -66,11 +118,25 @@ const MetricsOverview: React.FC<MetricsOverviewProps> = ({
                 <div className="text-xs text-slate-400">Real-time exposure</div>
             </div>
 
-            {/* 2. Total Floating P/L */}
+            {/* 2. 总持仓价值 */}
             <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
                 <div className="flex justify-between items-start mb-4">
                     <div>
-                        <p className="text-slate-500 text-sm font-medium">Total Floating P/L</p>
+                        <p className="text-slate-500 text-sm font-medium">总持仓价值</p>
+                        <h3 className="text-2xl font-bold text-slate-800 mt-1">{formatCurrency(posMetrics.totalPositionValue)}</h3>
+                    </div>
+                    <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
+                        <DollarSign size={20} />
+                    </div>
+                </div>
+                <div className="text-xs text-slate-400">Total position value</div>
+            </div>
+
+            {/* 3. 总浮动盈亏 */}
+            <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
+                <div className="flex justify-between items-start mb-4">
+                    <div>
+                        <p className="text-slate-500 text-sm font-medium">总浮动盈亏</p>
                         <h3 className={`text-2xl font-bold mt-1 ${posMetrics.totalFloatingPL >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                             {formatCurrency(posMetrics.totalFloatingPL)}
                         </h3>
@@ -82,11 +148,11 @@ const MetricsOverview: React.FC<MetricsOverviewProps> = ({
                 <div className="text-xs text-slate-400">Unrealized profit/loss</div>
             </div>
 
-            {/* 3. Avg Holding Time */}
+            {/* 4. 平均持仓时长 */}
             <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
                 <div className="flex justify-between items-start mb-4">
                     <div>
-                        <p className="text-slate-500 text-sm font-medium">Average Holding Time</p>
+                        <p className="text-slate-500 text-sm font-medium">平均持仓时长</p>
                         <h3 className="text-2xl font-bold text-slate-800 mt-1">{posMetrics.avgHoldingTime}</h3>
                     </div>
                     <div className="p-2 bg-purple-50 text-purple-600 rounded-lg">
@@ -94,6 +160,29 @@ const MetricsOverview: React.FC<MetricsOverviewProps> = ({
                     </div>
                 </div>
                 <div className="text-xs text-slate-400">Duration of open trades</div>
+            </div>
+
+            {/* 5. 净持仓 */}
+            <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
+                <div className="flex items-center gap-2 mb-4">
+                    <div className="p-2 bg-purple-50 text-purple-600 rounded-lg">
+                        <Scale size={20} />
+                    </div>
+                    <p className="text-slate-700 text-sm font-medium">净持仓</p>
+                </div>
+                <div className="flex items-center justify-between">
+                    {/* 左侧：主要方向 */}
+                    <div>
+                        <h3 className={`text-3xl font-bold ${posMetrics.longLots >= posMetrics.shortLots ? 'text-emerald-600' : 'text-red-600'}`}>
+                            {posMetrics.longLots >= posMetrics.shortLots ? '多头' : '空头'}
+                        </h3>
+                    </div>
+                    {/* 右侧：多空数量 */}
+                    <div className="text-sm text-slate-600 text-right">
+                        <div>多头数量: <span className="font-semibold text-slate-800">{formatNumber(posMetrics.longLots)}</span></div>
+                        <div>空头数量: <span className="font-semibold text-slate-800">{formatNumber(posMetrics.shortLots)}</span></div>
+                    </div>
+                </div>
             </div>
         </div>
     );

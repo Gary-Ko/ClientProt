@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { SettlementReport, ClientSummary, CashFlowTransaction, PageContext, TransactionType, CashFlowStatus, OpenPosition } from '../types';
+import { SettlementReport, ClientSummary, CashFlowTransaction, PageContext, TransactionType, CashFlowStatus, OpenPosition, ClosedPosition } from '../types';
 import { formatCurrency, formatNumber } from '../utils';
 import { ChevronLeft, ChevronRight, Eye, HelpCircle, User, ArrowUpRight, ArrowDownLeft, Repeat } from 'lucide-react';
 
@@ -11,6 +11,7 @@ interface DataTableProps {
   clientData: ClientSummary[];
   cashFlowData: CashFlowTransaction[];
   openPositionsData?: OpenPosition[];
+  closedPositionsData?: ClosedPosition[];
   onViewSettlement: (settlement: SettlementReport) => void;
   pageContext: PageContext;
 }
@@ -22,18 +23,19 @@ const DataTable: React.FC<DataTableProps> = ({
   clientData,
   cashFlowData,
   openPositionsData = [],
+  closedPositionsData = [],
   onViewSettlement,
   pageContext
 }) => {
   const [currentPage, setCurrentPage] = useState(1);
   
   // Requirement: Default 5 items for Positions page, 10 for others
-  const itemsPerPage = pageContext === 'positions' ? 5 : 10;
+  const itemsPerPage = (pageContext === 'positions' || pageContext === 'closed') ? 5 : 10;
   
   // Reset page when switching views or data changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [viewMode, pageContext, settlementData.length, clientData.length, cashFlowData.length, openPositionsData.length]);
+  }, [viewMode, pageContext, settlementData.length, clientData.length, cashFlowData.length, openPositionsData.length, closedPositionsData.length]);
 
   // Helper for Transaction Status styling
   const getStatusStyle = (status: CashFlowStatus | string) => {
@@ -336,54 +338,139 @@ const DataTable: React.FC<DataTableProps> = ({
           <table className="w-full text-sm text-left">
             <thead className="text-xs text-slate-500 uppercase bg-slate-50 border-b border-slate-200">
               <tr>
-                <th className="px-6 py-3 font-semibold whitespace-nowrap">Client Source</th>
-                <th className="px-6 py-3 font-semibold whitespace-nowrap">Trading Account</th>
-                <th className="px-6 py-3 font-semibold whitespace-nowrap">Open Time</th>
-                <th className="px-6 py-3 font-semibold whitespace-nowrap">Symbol / Dir</th>
-                <th className="px-6 py-3 font-semibold text-right whitespace-nowrap">Lots</th>
-                <th className="px-6 py-3 font-semibold text-right whitespace-nowrap">Open / Current</th>
-                <th className="px-6 py-3 font-semibold text-right whitespace-nowrap">Floating P/L</th>
-                <th className="px-6 py-3 font-semibold text-right whitespace-nowrap">Swap</th>
-                <th className="px-6 py-3 font-semibold whitespace-nowrap">Comment</th>
+                <th className="px-6 py-3 font-semibold whitespace-nowrap">订单号</th>
+                <th className="px-6 py-3 font-semibold whitespace-nowrap">客户名称</th>
+                <th className="px-6 py-3 font-semibold whitespace-nowrap">客户关系</th>
+                <th className="px-6 py-3 font-semibold whitespace-nowrap">交易账户</th>
+                <th className="px-6 py-3 font-semibold whitespace-nowrap">开仓时间</th>
+                <th className="px-6 py-3 font-semibold whitespace-nowrap">交易方向</th>
+                <th className="px-6 py-3 font-semibold whitespace-nowrap">交易品种</th>
+                <th className="px-6 py-3 font-semibold text-right whitespace-nowrap">手数</th>
+                <th className="px-6 py-3 font-semibold text-right whitespace-nowrap">开仓价格</th>
+                <th className="px-6 py-3 font-semibold text-right whitespace-nowrap">当前价格</th>
+                <th className="px-6 py-3 font-semibold text-right whitespace-nowrap">止盈</th>
+                <th className="px-6 py-3 font-semibold text-right whitespace-nowrap">止损</th>
+                <th className="px-6 py-3 font-semibold text-right whitespace-nowrap">手续费</th>
+                <th className="px-6 py-3 font-semibold text-right whitespace-nowrap">库存费</th>
+                <th className="px-6 py-3 font-semibold text-right whitespace-nowrap">盈亏</th>
+                <th className="px-6 py-3 font-semibold whitespace-nowrap">备注</th>
               </tr>
             </thead>
             <tbody>
               {paginatedData.map((row) => (
                 <tr key={row.id} className="bg-white border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                  <td className="px-6 py-4 font-medium text-slate-900">{row.orderId}</td>
                   <td className="px-6 py-4 text-slate-700">
                     <div className="flex flex-col">
-                        <span className="font-medium">
-                           {row.sourceType === 'Direct' ? 'Direct' : 'Agent'}: {row.clientName}
-                        </span>
+                        <span className="font-medium">{row.clientName}</span>
                         {row.relatedMemberId && (
                            <span className="text-xs text-slate-400 mt-0.5">
-                             Client {row.relatedMemberId}
+                             {row.relatedMemberId}
                            </span>
                         )}
                     </div>
                   </td>
+                  <td className="px-6 py-4 text-slate-600">
+                    {row.sourceType === 'Direct' ? '直客' : '代理'}
+                  </td>
                   <td className="px-6 py-4 font-medium text-slate-900">{row.accountId}</td>
                   <td className="px-6 py-4 text-slate-500 text-xs">{row.openTime}</td>
                   <td className="px-6 py-4">
-                     <div className="flex flex-col">
-                         <span className="font-semibold">{row.symbol}</span>
-                         <span className={`text-[10px] uppercase font-bold ${row.direction === 'Buy' ? 'text-emerald-600' : 'text-red-600'}`}>
-                             {row.direction}
-                         </span>
-                     </div>
+                     <span className={`text-xs uppercase font-bold px-2 py-1 rounded ${row.direction === 'Buy' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                         {row.direction === 'Buy' ? '多' : '空'}
+                     </span>
                   </td>
+                  <td className="px-6 py-4 font-semibold text-slate-900">{row.symbol}</td>
                   <td className="px-6 py-4 text-right font-medium">{formatNumber(row.lots)}</td>
-                  <td className="px-6 py-4 text-right">
-                     <div className="flex flex-col text-xs">
-                         <span className="text-slate-500">{row.openPrice}</span>
-                         <span className="font-medium text-slate-800">{row.currentPrice}</span>
-                     </div>
-                  </td>
+                  <td className="px-6 py-4 text-right text-slate-700">{formatNumber(row.openPrice)}</td>
+                  <td className="px-6 py-4 text-right font-medium text-slate-800">{formatNumber(row.currentPrice)}</td>
+                  <td className="px-6 py-4 text-right text-slate-600">{row.takeProfit ? formatNumber(row.takeProfit) : '--'}</td>
+                  <td className="px-6 py-4 text-right text-slate-600">{row.stopLoss ? formatNumber(row.stopLoss) : '--'}</td>
+                  <td className="px-6 py-4 text-right text-slate-600">{row.commission ? formatCurrency(row.commission) : '--'}</td>
+                  <td className="px-6 py-4 text-right text-slate-600">{formatCurrency(row.swap)}</td>
                   <td className={`px-6 py-4 text-right font-bold ${row.floatingPL >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                      {formatCurrency(row.floatingPL)}
                   </td>
-                  <td className="px-6 py-4 text-right text-slate-600">{formatCurrency(row.swap)}</td>
-                  <td className="px-6 py-4 text-slate-500 italic">{row.comment || '-'}</td>
+                  <td className="px-6 py-4 text-slate-500 italic text-xs">{row.comment || '--'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+    );
+  };
+
+  // Table 5: Closed Positions Table
+  const ClosedTable = () => {
+    const paginatedData = closedPositionsData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
+    if (closedPositionsData.length === 0) {
+        return <div className="p-8 text-center text-slate-500">No closed positions matching your filters.</div>;
+    }
+
+    return (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm text-left">
+            <thead className="text-xs text-slate-500 uppercase bg-slate-50 border-b border-slate-200">
+              <tr>
+                <th className="px-6 py-3 font-semibold whitespace-nowrap">订单号</th>
+                <th className="px-6 py-3 font-semibold whitespace-nowrap">交易服务器</th>
+                <th className="px-6 py-3 font-semibold whitespace-nowrap">客户名称</th>
+                <th className="px-6 py-3 font-semibold whitespace-nowrap">客户关系</th>
+                <th className="px-6 py-3 font-semibold whitespace-nowrap">交易账号</th>
+                <th className="px-6 py-3 font-semibold whitespace-nowrap">开仓时间</th>
+                <th className="px-6 py-3 font-semibold whitespace-nowrap">交易方向</th>
+                <th className="px-6 py-3 font-semibold whitespace-nowrap">交易品种</th>
+                <th className="px-6 py-3 font-semibold text-right whitespace-nowrap">手数</th>
+                <th className="px-6 py-3 font-semibold text-right whitespace-nowrap">开仓价格</th>
+                <th className="px-6 py-3 font-semibold text-right whitespace-nowrap">平仓价格</th>
+                <th className="px-6 py-3 font-semibold text-right whitespace-nowrap">止盈</th>
+                <th className="px-6 py-3 font-semibold text-right whitespace-nowrap">止损</th>
+                <th className="px-6 py-3 font-semibold whitespace-nowrap">平仓时间</th>
+                <th className="px-6 py-3 font-semibold text-right whitespace-nowrap">手续费</th>
+                <th className="px-6 py-3 font-semibold text-right whitespace-nowrap">库存费</th>
+                <th className="px-6 py-3 font-semibold text-right whitespace-nowrap">盈亏</th>
+                <th className="px-6 py-3 font-semibold whitespace-nowrap">备注</th>
+              </tr>
+            </thead>
+            <tbody>
+              {paginatedData.map((row) => (
+                <tr key={row.id} className="bg-white border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                  <td className="px-6 py-4 font-medium text-slate-900">{row.orderId}</td>
+                  <td className="px-6 py-4 text-slate-600">{row.server}</td>
+                  <td className="px-6 py-4 text-slate-700">
+                    <div className="flex flex-col">
+                        <span className="font-medium">{row.clientName}</span>
+                        {row.relatedMemberId && (
+                           <span className="text-xs text-slate-400 mt-0.5">
+                             {row.relatedMemberId}
+                           </span>
+                        )}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 text-slate-600">
+                    {row.sourceType === 'Direct' ? '直客' : '代理'}
+                  </td>
+                  <td className="px-6 py-4 font-medium text-slate-900">{row.accountId}</td>
+                  <td className="px-6 py-4 text-slate-500 text-xs">{row.openTime}</td>
+                  <td className="px-6 py-4">
+                     <span className={`text-xs uppercase font-bold px-2 py-1 rounded ${row.direction === 'Buy' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                         {row.direction === 'Buy' ? '多' : '空'}
+                     </span>
+                  </td>
+                  <td className="px-6 py-4 font-semibold text-slate-900">{row.symbol}</td>
+                  <td className="px-6 py-4 text-right font-medium">{formatNumber(row.lots)}</td>
+                  <td className="px-6 py-4 text-right text-slate-700">{formatNumber(row.openPrice)}</td>
+                  <td className="px-6 py-4 text-right font-medium text-slate-800">{formatNumber(row.closePrice)}</td>
+                  <td className="px-6 py-4 text-right text-slate-600">{row.takeProfit ? formatNumber(row.takeProfit) : '--'}</td>
+                  <td className="px-6 py-4 text-right text-slate-600">{row.stopLoss ? formatNumber(row.stopLoss) : '--'}</td>
+                  <td className="px-6 py-4 text-slate-500 text-xs">{row.closeTime}</td>
+                  <td className="px-6 py-4 text-right text-slate-600">{row.commission ? formatCurrency(row.commission) : '--'}</td>
+                  <td className="px-6 py-4 text-right text-slate-600">{row.swap ? formatCurrency(row.swap) : '--'}</td>
+                  <td className={`px-6 py-4 text-right font-bold ${row.profit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                     {formatCurrency(row.profit)}
+                  </td>
+                  <td className="px-6 py-4 text-slate-500 italic text-xs">{row.comment || '--'}</td>
                 </tr>
               ))}
             </tbody>
@@ -424,7 +511,7 @@ const DataTable: React.FC<DataTableProps> = ({
             </div>
         ) : (
             <div className="text-lg font-semibold text-slate-800 flex items-center gap-2">
-                {pageContext === 'cashflow' ? 'Cash Flow List' : 'Position Status'}
+                {pageContext === 'cashflow' ? 'Cash Flow List' : pageContext === 'positions' ? 'Position Status' : 'Closed Positions'}
                 <span className="text-xs font-normal text-slate-500 bg-slate-100 px-2 py-1 rounded-full">
                     {currentCount} records
                 </span>
@@ -436,6 +523,7 @@ const DataTable: React.FC<DataTableProps> = ({
       <div className="flex-1 min-h-[400px]">
         {pageContext === 'cashflow' ? <CashFlowTable /> : 
          pageContext === 'positions' ? <PositionsTable /> :
+         pageContext === 'closed' ? <ClosedTable /> :
          viewMode === 'summary' ? <SettlementTable /> : <ClientTable />}
       </div>
 

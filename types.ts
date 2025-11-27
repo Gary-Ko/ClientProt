@@ -31,7 +31,7 @@ export enum DateRangeOption {
   CUSTOM = 'Custom'
 }
 
-export type PageContext = 'commission' | 'cashflow' | 'positions';
+export type PageContext = 'commission' | 'cashflow' | 'positions' | 'closed';
 
 export interface ClientSummary {
   clientId: string;
@@ -95,6 +95,7 @@ export interface CashFlowTransaction {
 // New Interface for Open Positions
 export interface OpenPosition {
   id: string;
+  orderId: string; // 订单号
   sourceType: 'Direct' | 'Agent';
   clientName: string;
   relatedMemberId?: string; // For masked display e.g. 3223***44
@@ -105,9 +106,12 @@ export interface OpenPosition {
   lots: number;
   openPrice: number;
   currentPrice: number;
-  floatingPL: number;
-  swap: number;
-  comment?: string;
+  takeProfit?: number; // 止盈
+  stopLoss?: number; // 止损
+  commission?: number; // 手续费
+  swap: number; // 库存费
+  floatingPL: number; // 盈亏
+  comment?: string; // 备注
 }
 
 export interface FilterState {
@@ -141,9 +145,45 @@ export interface CashFlowMetrics {
 
 // New Interface for Position Metrics
 export interface PositionMetrics {
-  totalOpenLots: number;
-  totalFloatingPL: number;
-  avgHoldingTime: string;
+  totalOpenLots: number; // 总持仓手数
+  totalPositionValue: number; // 总持仓价值
+  totalFloatingPL: number; // 总浮动盈亏
+  avgHoldingTime: string; // 平均持仓时长
+  longLots: number; // 多单数量
+  shortLots: number; // 空单数量
+}
+
+// Interface for Closed Positions
+export interface ClosedPosition {
+  id: string;
+  orderId: string; // 订单号
+  server: string; // 交易服务器
+  sourceType: 'Direct' | 'Agent';
+  clientName: string;
+  relatedMemberId?: string;
+  accountId: string; // 交易账号
+  openTime: string; // 开仓时间
+  closeTime: string; // 平仓时间
+  symbol: string; // 交易品种
+  direction: 'Buy' | 'Sell'; // 交易方向
+  lots: number; // 手数
+  openPrice: number; // 开仓价格
+  closePrice: number; // 平仓价格
+  takeProfit?: number; // 止盈
+  stopLoss?: number; // 止损
+  commission?: number; // 手续费
+  swap?: number; // 库存费
+  profit: number; // 盈亏（正数表示利润，负数表示亏损）
+  comment?: string; // 备注
+}
+
+// Interface for Closed Positions Metrics
+export interface ClosedMetrics {
+  totalTrades: number; // 总交易数
+  totalLots: number; // 总手数
+  totalProfit: number; // 总利润
+  totalLoss: number; // 总亏损
+  netPL: number; // 净盈亏
 }
 
 export interface WalletItem {

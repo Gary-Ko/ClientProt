@@ -88,27 +88,27 @@ const FilterBar: React.FC<FilterBarProps> = ({ filters, setFilters, searchTerm, 
       value: filters.relation,
       defaultValue: ClientRelation.ALL
     },
-    // Only add Status filter if not Positions Page
-    ...(pageContext !== 'positions' ? [{
+    // Only add Status filter if not Positions or Closed Page
+    ...(pageContext !== 'positions' && pageContext !== 'closed' ? [{
         key: 'status',
         label: 'Status',
         value: filters.status,
         defaultValue: pageContext === 'commission' ? CommissionStatus.ALL : CashFlowStatus.ALL
     }] : []),
-    // Symbol & Direction for Commission & Positions
+    // Symbol & Direction for Commission & Positions & Closed
     ...(pageContext === 'commission' ? [{
       key: 'symbol',
       label: 'Trading Symbol',
       value: filters.symbol,
       defaultValue: 'All'
     }] : []),
-    ...(pageContext === 'positions' && filters.selectedSymbols && !filters.selectedSymbols.includes('All') ? [{
+    ...((pageContext === 'positions' || pageContext === 'closed') && filters.selectedSymbols && !filters.selectedSymbols.includes('All') ? [{
         key: 'selectedSymbols',
         label: 'Symbols',
         value: filters.selectedSymbols.length > 2 ? `${filters.selectedSymbols.length} Selected` : filters.selectedSymbols.join(', '),
         defaultValue: ['All'] // Uses default value 'All' to trigger chip display when not 'All'
     }] : []),
-    ...(pageContext === 'positions' && filters.direction !== 'All' ? [{
+    ...((pageContext === 'positions' || pageContext === 'closed') && filters.direction !== 'All' ? [{
         key: 'direction',
         label: 'Direction',
         value: filters.direction,
@@ -193,8 +193,8 @@ const FilterBar: React.FC<FilterBarProps> = ({ filters, setFilters, searchTerm, 
                     </div>
                   </div>
 
-                  {/* Status (Not for Positions) */}
-                  {pageContext !== 'positions' && (
+                  {/* Status (Not for Positions or Closed) */}
+                  {pageContext !== 'positions' && pageContext !== 'closed' && (
                     <div className="space-y-2">
                         <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</label>
                         <div className="flex flex-wrap gap-2">
@@ -236,10 +236,10 @@ const FilterBar: React.FC<FilterBarProps> = ({ filters, setFilters, searchTerm, 
                     </div>
                   )}
 
-                  {/* Symbol Multi-select for Positions */}
-                  {pageContext === 'positions' && (
+                  {/* Symbol Multi-select for Positions & Closed */}
+                  {(pageContext === 'positions' || pageContext === 'closed') && (
                     <div className="space-y-2" ref={symbolDropdownRef}>
-                        <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Trading Symbol (Multi)</label>
+                        <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">交易品种</label>
                         <div className="relative">
                             <button 
                                 onClick={() => setIsSymbolDropdownOpen(!isSymbolDropdownOpen)}
@@ -247,8 +247,8 @@ const FilterBar: React.FC<FilterBarProps> = ({ filters, setFilters, searchTerm, 
                             >
                                 <span className="truncate">
                                     {filters.selectedSymbols?.includes('All') 
-                                        ? 'All Symbols' 
-                                        : `${filters.selectedSymbols?.length} Selected`}
+                                        ? '全部' 
+                                        : `${filters.selectedSymbols?.length} 个已选`}
                                 </span>
                                 <ChevronDown size={14} className="text-slate-400" />
                             </button>
@@ -276,10 +276,10 @@ const FilterBar: React.FC<FilterBarProps> = ({ filters, setFilters, searchTerm, 
                     </div>
                   )}
 
-                  {/* Direction - Only for Positions */}
-                  {pageContext === 'positions' && (
+                  {/* Direction - For Positions & Closed */}
+                  {(pageContext === 'positions' || pageContext === 'closed') && (
                         <div className="space-y-2">
-                            <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Trading Direction</label>
+                            <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">交易方向</label>
                             <div className="flex gap-2">
                                 {['All', 'Buy', 'Sell'].map(val => (
                                     <button
@@ -287,11 +287,11 @@ const FilterBar: React.FC<FilterBarProps> = ({ filters, setFilters, searchTerm, 
                                         onClick={() => setFilters(prev => ({ ...prev, direction: val }))}
                                         className={`flex-1 px-3 py-1.5 text-xs rounded-md border transition-all ${
                                             filters.direction === val
-                                            ? 'bg-primary-600 border-primary-600 text-white shadow-sm'
-                                            : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'
+                                                ? 'bg-primary-600 border-primary-600 text-white shadow-sm'
+                                                : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'
                                         }`}
                                     >
-                                        {val}
+                                        {val === 'All' ? '全部' : val === 'Buy' ? '买' : '卖'}
                                     </button>
                                 ))}
                             </div>
@@ -322,8 +322,8 @@ const FilterBar: React.FC<FilterBarProps> = ({ filters, setFilters, searchTerm, 
         {/* Right Side: Date Filters & Export */}
         <div className="flex flex-col sm:flex-row items-center gap-3 border-t xl:border-t-0 border-slate-100 pt-3 xl:pt-0">
           
-          {/* Date Range: Hide for Positions Page */}
-          {pageContext !== 'positions' && (
+          {/* Date Range: Hide for Positions and Closed Pages */}
+          {pageContext !== 'positions' && pageContext !== 'closed' && (
             <>
                 <div className="flex bg-slate-100 p-1 rounded-lg w-full sm:w-auto overflow-x-auto">
                     {Object.values(DateRangeOption).map((option) => (

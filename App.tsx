@@ -1,14 +1,14 @@
 
 import React, { useState, useMemo } from 'react';
 import { FilterState, ClientRelation, CommissionStatus, CashFlowStatus, DateRangeOption, SettlementReport, PageContext, TransactionType } from './types';
-import { MOCK_METRICS, MOCK_DETAILS, MOCK_SETTLEMENTS, MOCK_WALLETS_TOTAL, MOCK_WALLETS_SETTLED, MOCK_WALLETS_PENDING, MOCK_CLIENTS, MOCK_CASH_FLOW_METRICS, MOCK_CASH_FLOW_DATA, MOCK_POSITIONS_METRICS, MOCK_OPEN_POSITIONS } from './constants';
+import { MOCK_METRICS, MOCK_DETAILS, MOCK_SETTLEMENTS, MOCK_WALLETS_TOTAL, MOCK_WALLETS_SETTLED, MOCK_WALLETS_PENDING, MOCK_CLIENTS, MOCK_CASH_FLOW_METRICS, MOCK_CASH_FLOW_DATA, MOCK_POSITIONS_METRICS, MOCK_OPEN_POSITIONS, MOCK_CLOSED_METRICS, MOCK_CLOSED_POSITIONS } from './constants';
 import FilterBar from './components/FilterBar';
 import MetricsOverview from './components/MetricsOverview';
 import ChartsSection from './components/ChartsSection';
 import DataTable from './components/DataTable';
 import WalletDrawer from './components/WalletDrawer';
 import CommissionDrawer from './components/CommissionDrawer';
-import { LayoutDashboard, WalletCards, CandlestickChart } from 'lucide-react';
+import { LayoutDashboard, WalletCards, CandlestickChart, History } from 'lucide-react';
 
 const App: React.FC = () => {
   // Page State
@@ -48,7 +48,7 @@ const App: React.FC = () => {
   const handleExport = () => {
     const now = new Date();
     const formattedDate = now.toISOString().replace(/[-:T.]/g, '').slice(0, 14); // YYYYMMDDHHMMSS
-    const reportType = activePage === 'commission' ? 'CommissionReport' : activePage === 'cashflow' ? 'CashFlowReport' : 'OpenPositionsReport';
+    const reportType = activePage === 'commission' ? 'CommissionReport' : activePage === 'cashflow' ? 'CashFlowReport' : activePage === 'positions' ? 'OpenPositionsReport' : 'ClosedPositionsReport';
     const filename = `${reportType}_${formattedDate}.csv`;
 
     const csvContent = "data:text/csv;charset=utf-8,ID,Date,Amount,Status\n" 
@@ -134,6 +134,30 @@ const App: React.FC = () => {
     });
   }, [activePage, searchTerm, filters]);
 
+  // Filter Logic for Closed Positions
+  const filteredClosed = useMemo(() => {
+    if (activePage !== 'closed') return [];
+    return MOCK_CLOSED_POSITIONS.filter(pos => {
+        const term = searchTerm.toLowerCase();
+        // 1. Client Search
+        const matchesSearch = 
+            pos.clientName.toLowerCase().includes(term) || 
+            pos.accountId.toLowerCase().includes(term) ||
+            pos.orderId.toLowerCase().includes(term);
+        
+        // 2. Symbol (Multi-select)
+        const matchesSymbol = filters.selectedSymbols.includes('All') || filters.selectedSymbols.includes(pos.symbol);
+
+        // 3. Direction
+        const matchesDirection = filters.direction === 'All' || pos.direction === filters.direction;
+
+        // 4. Tier View
+        const matchesRelation = filters.relation === ClientRelation.ALL || pos.sourceType === filters.relation;
+
+        return matchesSearch && matchesSymbol && matchesDirection && matchesRelation;
+    });
+  }, [activePage, searchTerm, filters]);
+
   // Calculate filtered Cash Flow Metrics
   const filteredCashFlowMetrics = useMemo(() => {
     if (activePage !== 'cashflow') return null;
@@ -156,6 +180,33 @@ const App: React.FC = () => {
       netCashFlow: totalInflow - totalOutflow
     };
   }, [activePage, filteredCashFlow]);
+
+  // Calculate filtered Closed Positions Metrics
+  const filteredClosedMetrics = useMemo(() => {
+    if (activePage !== 'closed') return null;
+    
+    let totalTrades = filteredClosed.length;
+    let totalLots = 0;
+    let totalProfit = 0;
+    let totalLoss = 0;
+    
+    filteredClosed.forEach(pos => {
+      totalLots += pos.lots;
+      if (pos.profit > 0) {
+        totalProfit += pos.profit;
+      } else {
+        totalLoss += Math.abs(pos.profit);
+      }
+    });
+    
+    return {
+      totalTrades,
+      totalLots,
+      totalProfit,
+      totalLoss: -totalLoss, // Keep as negative for display
+      netPL: totalProfit - totalLoss
+    };
+  }, [activePage, filteredClosed]);
 
   // Determine Wallet Drawer Data
   const walletDrawerData = useMemo(() => {
@@ -231,6 +282,17 @@ const App: React.FC = () => {
                         <CandlestickChart size={18} />
                         Open Positions
                     </button>
+                    <button
+                        onClick={() => handlePageChange('closed')}
+                        className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors flex items-center gap-2 ${
+                            activePage === 'closed' 
+                            ? 'bg-slate-100 text-primary-700' 
+                            : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+                        }`}
+                    >
+                        <History size={18} />
+                        已平仓
+                    </button>
                 </nav>
             </div>
 
@@ -267,7 +329,8 @@ const App: React.FC = () => {
             metrics={
               activePage === 'commission' ? MOCK_METRICS : 
               activePage === 'cashflow' ? (filteredCashFlowMetrics || MOCK_CASH_FLOW_METRICS) : 
-              MOCK_POSITIONS_METRICS
+              activePage === 'positions' ? MOCK_POSITIONS_METRICS :
+              (filteredClosedMetrics || MOCK_CLOSED_METRICS)
             } 
             pageContext={activePage}
             onTotalClick={() => setWalletDrawerType('total')}
@@ -282,6 +345,8 @@ const App: React.FC = () => {
           <ChartsSection 
             pageContext={activePage} 
             cashFlowData={activePage === 'cashflow' ? filteredCashFlow : undefined}
+            openPositionsData={activePage === 'positions' ? filteredPositions : undefined}
+            closedPositionsData={activePage === 'closed' ? filteredClosed : undefined}
           />
         </section>
 
@@ -294,6 +359,7 @@ const App: React.FC = () => {
             clientData={filteredClients}
             cashFlowData={filteredCashFlow}
             openPositionsData={filteredPositions}
+            closedPositionsData={filteredClosed}
             onViewSettlement={(settlement) => setSelectedSettlement(settlement)}
             pageContext={activePage}
           />

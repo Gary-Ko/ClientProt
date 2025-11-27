@@ -1,5 +1,5 @@
 
-import { ClientSummary, CommissionDetail, MetricData, SettlementReport, WalletItem, CashFlowMetrics, CashFlowTransaction, TransactionType, CashFlowStatus, PositionMetrics, OpenPosition } from './types';
+import { ClientSummary, CommissionDetail, MetricData, SettlementReport, WalletItem, CashFlowMetrics, CashFlowTransaction, TransactionType, CashFlowStatus, PositionMetrics, OpenPosition, ClosedPosition, ClosedMetrics } from './types';
 
 export const TRADING_SYMBOLS = ['All', 'EURUSD', 'GBPUSD', 'XAUUSD', 'BTCUSD', 'US30'];
 
@@ -24,8 +24,20 @@ export const MOCK_CASH_FLOW_METRICS: CashFlowMetrics = {
 // --- Mock Position Metrics ---
 export const MOCK_POSITIONS_METRICS: PositionMetrics = {
   totalOpenLots: 1500,
+  totalPositionValue: 1250000.00,
   totalFloatingPL: -12000.50,
-  avgHoldingTime: "14h 32m"
+  avgHoldingTime: "14h 32m",
+  longLots: 850,
+  shortLots: 650
+};
+
+// --- Mock Closed Positions Metrics ---
+export const MOCK_CLOSED_METRICS: ClosedMetrics = {
+  totalTrades: 1250,
+  totalLots: 8500,
+  totalProfit: 125000.00,
+  totalLoss: -45000.00,
+  netPL: 80000.00
 };
 
 export const MOCK_WALLETS_TOTAL: WalletItem[] = [
@@ -153,6 +165,7 @@ export const MOCK_OPEN_POSITIONS: OpenPosition[] = Array.from({ length: 25 }).ma
   
   return {
     id: `POS-${5000 + i}`,
+    orderId: `ORD-${8000 + i}`,
     sourceType: (isAgent ? 'Agent' : 'Direct') as 'Direct' | 'Agent',
     clientName: isAgent ? `Li Si ${i}` : `Zhang San ${i}`,
     relatedMemberId: isSubAgentClient ? `3223${i}${i}44` : undefined,
@@ -163,8 +176,11 @@ export const MOCK_OPEN_POSITIONS: OpenPosition[] = Array.from({ length: 25 }).ma
     lots: Number((Math.random() * 5 + 0.1).toFixed(2)),
     openPrice: Number(openPrice.toFixed(symbol.includes('USD') && !symbol.includes('XAU') && !symbol.includes('BTC') ? 5 : 2)),
     currentPrice: Number(currentPrice.toFixed(symbol.includes('USD') && !symbol.includes('XAU') && !symbol.includes('BTC') ? 5 : 2)),
-    floatingPL: Number(((Math.random() * 1000) - 300).toFixed(2)),
+    takeProfit: direction === 'Buy' ? Number((openPrice * 1.05).toFixed(symbol.includes('USD') && !symbol.includes('XAU') && !symbol.includes('BTC') ? 5 : 2)) : Number((openPrice * 0.95).toFixed(symbol.includes('USD') && !symbol.includes('XAU') && !symbol.includes('BTC') ? 5 : 2)),
+    stopLoss: direction === 'Buy' ? Number((openPrice * 0.98).toFixed(symbol.includes('USD') && !symbol.includes('XAU') && !symbol.includes('BTC') ? 5 : 2)) : Number((openPrice * 1.02).toFixed(symbol.includes('USD') && !symbol.includes('XAU') && !symbol.includes('BTC') ? 5 : 2)),
+    commission: Number((Math.random() * 5 + 1).toFixed(2)),
     swap: Number(((Math.random() * 10) - 5).toFixed(2)),
+    floatingPL: Number(((Math.random() * 1000) - 300).toFixed(2)),
     comment: i % 5 === 0 ? 'EA Trade' : ''
   };
 }).sort((a, b) => new Date(b.openTime).getTime() - new Date(a.openTime).getTime());
@@ -239,3 +255,37 @@ export const CHART_POSITIONS_NET_EXPOSURE = [
   { name: 'Total Buy Lots', value: 950 },
   { name: 'Total Sell Lots', value: 550 },
 ];
+
+// --- Mock Closed Positions ---
+export const MOCK_CLOSED_POSITIONS: ClosedPosition[] = Array.from({ length: 30 }).map((_, i) => {
+  const isAgent = i % 3 === 0;
+  const isSubAgentClient = isAgent && i % 2 === 0;
+  const direction = i % 2 === 0 ? 'Buy' : 'Sell';
+  const symbol = TRADING_SYMBOLS[1 + (i % 5)];
+  const openPrice = symbol === 'XAUUSD' ? 2000 : symbol === 'BTCUSD' ? 65000 : 1.05;
+  const closePrice = direction === 'Buy' ? openPrice * 1.02 : openPrice * 0.98;
+  const profit = direction === 'Buy' ? (closePrice - openPrice) * 100 : (openPrice - closePrice) * 100;
+  
+  return {
+    id: `CLOSED-${6000 + i}`,
+    orderId: `ORD-${9000 + i}`,
+    server: `Server-${100 + (i % 5)}`,
+    sourceType: (isAgent ? 'Agent' : 'Direct') as 'Direct' | 'Agent',
+    clientName: isAgent ? `Li Si ${i}` : `Zhang San ${i}`,
+    relatedMemberId: isSubAgentClient ? `3223${i}${i}44` : undefined,
+    accountId: `MT4-${88800 + i}`,
+    openTime: `2023-11-${String(15 - (i % 10)).padStart(2, '0')} 08:30:00`,
+    closeTime: `2023-11-${String(20 - (i % 10)).padStart(2, '0')} 14:30:00`,
+    symbol: symbol,
+    direction: direction as 'Buy' | 'Sell',
+    lots: Number((Math.random() * 5 + 0.1).toFixed(2)),
+    openPrice: Number(openPrice.toFixed(symbol.includes('USD') && !symbol.includes('XAU') && !symbol.includes('BTC') ? 5 : 2)),
+    closePrice: Number(closePrice.toFixed(symbol.includes('USD') && !symbol.includes('XAU') && !symbol.includes('BTC') ? 5 : 2)),
+    takeProfit: direction === 'Buy' ? Number((openPrice * 1.05).toFixed(symbol.includes('USD') && !symbol.includes('XAU') && !symbol.includes('BTC') ? 5 : 2)) : Number((openPrice * 0.95).toFixed(symbol.includes('USD') && !symbol.includes('XAU') && !symbol.includes('BTC') ? 5 : 2)),
+    stopLoss: direction === 'Buy' ? Number((openPrice * 0.98).toFixed(symbol.includes('USD') && !symbol.includes('XAU') && !symbol.includes('BTC') ? 5 : 2)) : Number((openPrice * 1.02).toFixed(symbol.includes('USD') && !symbol.includes('XAU') && !symbol.includes('BTC') ? 5 : 2)),
+    commission: Number((Math.random() * 5 + 1).toFixed(2)),
+    swap: Number(((Math.random() * 10) - 5).toFixed(2)),
+    profit: Number(profit.toFixed(2)),
+    comment: i % 5 === 0 ? 'EA Trade' : ''
+  };
+}).sort((a, b) => new Date(b.closeTime).getTime() - new Date(a.closeTime).getTime());
