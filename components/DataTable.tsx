@@ -209,23 +209,53 @@ const DataTable: React.FC<DataTableProps> = ({
   // Table 3: Cash Flow List
   const CashFlowTable = () => {
     const paginatedData = cashFlowData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+    const [tooltipPosition, setTooltipPosition] = useState<{ top: number; right: number } | null>(null);
+    const tooltipRef = React.useRef<HTMLDivElement>(null);
+    const triggerRef = React.useRef<HTMLDivElement>(null);
+
+    const handleMouseEnter = (e: React.MouseEvent<HTMLDivElement>) => {
+      if (triggerRef.current) {
+        const rect = triggerRef.current.getBoundingClientRect();
+        setTooltipPosition({
+          top: rect.top,
+          right: window.innerWidth - rect.right
+        });
+      }
+    };
+
+    const handleMouseLeave = () => {
+      setTooltipPosition(null);
+    };
 
     if (cashFlowData.length === 0) {
         return <div className="p-8 text-center text-slate-500">No transaction records found.</div>;
     }
 
     return (
-        <div className="overflow-x-auto">
+        <>
+        <div className="overflow-x-auto relative">
           <table className="w-full text-sm text-left">
-            <thead className="text-xs text-slate-500 uppercase bg-slate-50 border-b border-slate-200">
+            <thead className="text-xs text-slate-500 uppercase bg-slate-50 border-b border-slate-200 sticky top-0 z-10">
               <tr>
                 <th className="px-6 py-3 font-semibold whitespace-nowrap">Transaction No.</th>
                 <th className="px-6 py-3 font-semibold whitespace-nowrap">Client Source</th>
                 <th className="px-6 py-3 font-semibold whitespace-nowrap">Type</th>
-                <th className="px-6 py-3 font-semibold text-right whitespace-nowrap">Amount</th>
+                <th className="px-6 py-3 font-semibold text-right whitespace-nowrap">
+                  <div 
+                    ref={triggerRef}
+                    className="flex items-center justify-end gap-1 group relative cursor-help"
+                    onMouseEnter={handleMouseEnter}
+                    onMouseLeave={handleMouseLeave}
+                  >
+                    预估金额
+                    <HelpCircle size={14} className="text-slate-400" />
+                  </div>
+                </th>
+                <th className="px-6 py-3 font-semibold text-right whitespace-nowrap">实际金额</th>
                 <th className="px-6 py-3 font-semibold text-center whitespace-nowrap">Status</th>
                 <th className="px-6 py-3 font-semibold text-right whitespace-nowrap">Submit Time</th>
                 <th className="px-6 py-3 font-semibold text-right whitespace-nowrap">Complete Time</th>
+                <th className="px-6 py-3 font-semibold whitespace-nowrap">备注</th>
               </tr>
             </thead>
             <tbody>
@@ -255,6 +285,9 @@ const DataTable: React.FC<DataTableProps> = ({
                   }`}>
                     {row.type === TransactionType.WITHDRAWAL ? '-' : '+'}{formatCurrency(row.amount)}
                   </td>
+                  <td className="px-6 py-4 text-right text-slate-700">
+                    {formatNumber(row.originalAmount)} {row.currency}
+                  </td>
                   <td className="px-6 py-4 text-center">
                     <span className={`inline-flex px-2 py-1 rounded text-xs font-medium ${getStatusStyle(row.status)}`}>
                         {row.status}
@@ -262,12 +295,32 @@ const DataTable: React.FC<DataTableProps> = ({
                   </td>
                   <td className="px-6 py-4 text-right text-slate-500">{row.submitTime}</td>
                   <td className="px-6 py-4 text-right text-slate-500">{row.completeTime || '--'}</td>
+                  <td className="px-6 py-4 text-slate-500 text-sm max-w-xs">
+                    <div className="truncate" title={row.remark || ''}>
+                      {row.remark || '--'}
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-      );
+        {tooltipPosition && (
+          <div
+            ref={tooltipRef}
+            className="fixed w-64 p-2 bg-slate-800 text-white text-xs rounded shadow-lg z-[99999] normal-case font-normal pointer-events-none"
+            style={{
+              top: `${tooltipPosition.top}px`,
+              right: `${tooltipPosition.right}px`,
+              transform: 'translateY(calc(-100% - 8px))'
+            }}
+          >
+            根据实际金额换算成美元，便于展示
+            <div className="absolute top-full right-2 -mt-1 border-4 border-transparent border-t-slate-800"></div>
+          </div>
+        )}
+        </>
+    );
   };
 
   // Table 4: Open Positions Table

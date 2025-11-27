@@ -123,7 +123,7 @@ const FilterBar: React.FC<FilterBarProps> = ({ filters, setFilters, searchTerm, 
   });
 
   return (
-    <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 relative z-20">
+    <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 relative">
       <div className="flex flex-col xl:flex-row gap-4 justify-between">
         
         {/* Left Side: Search & Filter Button */}

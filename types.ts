@@ -83,10 +83,13 @@ export interface CashFlowTransaction {
   clientName: string;
   accountId: string; 
   type: TransactionType;
-  amount: number;
+  currency: string;
+  amount: number; // 预估金额（USD）
+  originalAmount: number; // 实际金额（原始货币）
   status: CashFlowStatus;
   submitTime: string;
   completeTime: string | null;
+  remark?: string; // 备注（审核不通过的理由）
 }
 
 // New Interface for Open Positions

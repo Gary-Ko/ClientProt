@@ -106,6 +106,22 @@ export const MOCK_CASH_FLOW_DATA: CashFlowTransaction[] = Array.from({ length: 4
   if (i % 13 === 0) status = statuses[2];
 
   const isAgent = i % 4 === 0;
+  const currencies = ['USD', 'USDT', 'EUR', 'BTC'];
+  const currency = currencies[i % currencies.length];
+  
+  // 实际金额（原始货币）
+  const originalAmount = Number((Math.random() * 5000 + 100).toFixed(2));
+  
+  // 预估金额（转换为USD）
+  let estimatedAmount = originalAmount;
+  if (currency === 'EUR') estimatedAmount = originalAmount * 1.08;
+  if (currency === 'BTC') estimatedAmount = originalAmount * 65000;
+  if (currency === 'USDT') estimatedAmount = originalAmount;
+  
+  // 如果状态是失败，添加备注
+  const remark = status === CashFlowStatus.FAILED 
+    ? `审核不通过：${i % 3 === 0 ? '账户余额不足' : i % 3 === 1 ? '身份验证失败' : '交易限额超限'}`
+    : undefined;
 
   return {
     id: `CF-${1000 + i}`,
@@ -114,12 +130,15 @@ export const MOCK_CASH_FLOW_DATA: CashFlowTransaction[] = Array.from({ length: 4
     clientName: isAgent ? `Agent User ${i}` : `Client User ${i}`,
     accountId: `MT4-${10000 + i}`,
     type: type,
-    amount: Number((Math.random() * 5000 + 100).toFixed(2)),
+    currency: currency,
+    amount: Number(estimatedAmount.toFixed(2)),
+    originalAmount: originalAmount,
     status: status,
     submitTime: `2023-11-${String(1 + (i % 28)).padStart(2, '0')} 09:30:00`,
     completeTime: status === CashFlowStatus.SUCCESS || status === CashFlowStatus.FAILED 
       ? `2023-11-${String(1 + (i % 28)).padStart(2, '0')} 10:15:00` 
-      : null
+      : null,
+    remark: remark
   };
 });
 

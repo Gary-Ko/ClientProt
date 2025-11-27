@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import { FilterState, ClientRelation, CommissionStatus, CashFlowStatus, DateRangeOption, SettlementReport, PageContext } from './types';
+import { FilterState, ClientRelation, CommissionStatus, CashFlowStatus, DateRangeOption, SettlementReport, PageContext, TransactionType } from './types';
 import { MOCK_METRICS, MOCK_DETAILS, MOCK_SETTLEMENTS, MOCK_WALLETS_TOTAL, MOCK_WALLETS_SETTLED, MOCK_WALLETS_PENDING, MOCK_CLIENTS, MOCK_CASH_FLOW_METRICS, MOCK_CASH_FLOW_DATA, MOCK_POSITIONS_METRICS, MOCK_OPEN_POSITIONS } from './constants';
 import FilterBar from './components/FilterBar';
 import MetricsOverview from './components/MetricsOverview';
@@ -90,6 +90,9 @@ const App: React.FC = () => {
   const filteredCashFlow = useMemo(() => {
     if (activePage !== 'cashflow') return [];
     return MOCK_CASH_FLOW_DATA.filter(cf => {
+        // Exclude internal transfer transactions
+        if (cf.type === TransactionType.TRANSFER) return false;
+        
         const term = searchTerm.toLowerCase();
         // Search client name or account ID or transaction no
         const matchesSearch = 
@@ -130,6 +133,29 @@ const App: React.FC = () => {
         return matchesSearch && matchesSymbol && matchesDirection && matchesRelation;
     });
   }, [activePage, searchTerm, filters]);
+
+  // Calculate filtered Cash Flow Metrics
+  const filteredCashFlowMetrics = useMemo(() => {
+    if (activePage !== 'cashflow') return null;
+    
+    let totalInflow = 0;
+    let totalOutflow = 0;
+    
+    filteredCashFlow.forEach(tx => {
+      if (tx.type === TransactionType.DEPOSIT) {
+        totalInflow += tx.amount; // amount is already in USD
+      } else if (tx.type === TransactionType.WITHDRAWAL) {
+        totalOutflow += tx.amount;
+      }
+    });
+    
+    return {
+      totalInflow,
+      totalOutflow,
+      totalInternalTransfer: 0, // Not used anymore
+      netCashFlow: totalInflow - totalOutflow
+    };
+  }, [activePage, filteredCashFlow]);
 
   // Determine Wallet Drawer Data
   const walletDrawerData = useMemo(() => {
@@ -224,7 +250,7 @@ const App: React.FC = () => {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
         
         {/* Section 1: Filters */}
-        <section>
+        <section className="sticky top-16 z-20">
           <FilterBar 
             filters={filters} 
             setFilters={setFilters} 
@@ -238,17 +264,25 @@ const App: React.FC = () => {
         {/* Section 2: Metrics */}
         <section>
           <MetricsOverview 
-            metrics={activePage === 'commission' ? MOCK_METRICS : activePage === 'cashflow' ? MOCK_CASH_FLOW_METRICS : MOCK_POSITIONS_METRICS} 
+            metrics={
+              activePage === 'commission' ? MOCK_METRICS : 
+              activePage === 'cashflow' ? (filteredCashFlowMetrics || MOCK_CASH_FLOW_METRICS) : 
+              MOCK_POSITIONS_METRICS
+            } 
             pageContext={activePage}
             onTotalClick={() => setWalletDrawerType('total')}
             onSettledClick={() => setWalletDrawerType('settled')}
             onPendingClick={() => setWalletDrawerType('pending')}
+            cashFlowData={activePage === 'cashflow' ? filteredCashFlow : undefined}
           />
         </section>
 
         {/* Section 3: Charts */}
         <section>
-          <ChartsSection pageContext={activePage} />
+          <ChartsSection 
+            pageContext={activePage} 
+            cashFlowData={activePage === 'cashflow' ? filteredCashFlow : undefined}
+          />
         </section>
 
         {/* Section 4: Data Table */}

@@ -1,8 +1,8 @@
 
-import React from 'react';
-import { MetricData, CashFlowMetrics, PageContext, PositionMetrics } from '../types';
+import React, { useMemo } from 'react';
+import { MetricData, CashFlowMetrics, PageContext, PositionMetrics, CashFlowTransaction, TransactionType } from '../types';
 import { formatCurrency, formatNumber } from '../utils';
-import { DollarSign, Activity, Users, Wallet, Clock, ChevronRight, ArrowDownLeft, ArrowUpRight, Repeat, BarChart4, Hourglass, Layers, TrendingUp } from 'lucide-react';
+import { DollarSign, Activity, Users, Wallet, Clock, ChevronRight, ArrowDownLeft, ArrowUpRight, BarChart4, Hourglass, Layers, TrendingUp } from 'lucide-react';
 
 interface MetricsOverviewProps {
   metrics: MetricData | CashFlowMetrics | PositionMetrics;
@@ -10,6 +10,7 @@ interface MetricsOverviewProps {
   onTotalClick: () => void;
   onSettledClick: () => void;
   onPendingClick: () => void;
+  cashFlowData?: CashFlowTransaction[]; // 用于计算货币明细
 }
 
 const MetricsOverview: React.FC<MetricsOverviewProps> = ({ 
@@ -17,8 +18,34 @@ const MetricsOverview: React.FC<MetricsOverviewProps> = ({
   pageContext,
   onTotalClick,
   onSettledClick,
-  onPendingClick 
+  onPendingClick,
+  cashFlowData = []
 }) => {
+  
+  // 计算货币明细（按币种汇总）
+  const currencyBreakdown = useMemo(() => {
+    if (pageContext !== 'cashflow' || !cashFlowData.length) return { inflow: {}, outflow: {}, net: {} };
+    
+    const inflow: Record<string, number> = {};
+    const outflow: Record<string, number> = {};
+    
+    cashFlowData.forEach(tx => {
+      if (tx.type === TransactionType.DEPOSIT) {
+        inflow[tx.currency] = (inflow[tx.currency] || 0) + tx.originalAmount;
+      } else if (tx.type === TransactionType.WITHDRAWAL) {
+        outflow[tx.currency] = (outflow[tx.currency] || 0) + tx.originalAmount;
+      }
+    });
+    
+    // 计算净现金流
+    const net: Record<string, number> = {};
+    const allCurrencies = new Set([...Object.keys(inflow), ...Object.keys(outflow)]);
+    allCurrencies.forEach(currency => {
+      net[currency] = (inflow[currency] || 0) - (outflow[currency] || 0);
+    });
+    
+    return { inflow, outflow, net };
+  }, [pageContext, cashFlowData]);
   
   // Render Open Positions Metrics
   if (pageContext === 'positions') {
@@ -76,12 +103,12 @@ const MetricsOverview: React.FC<MetricsOverviewProps> = ({
   if (pageContext === 'cashflow') {
     const cfMetrics = metrics as CashFlowMetrics;
     return (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {/* 1. Total Inflow */}
-            <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
+            <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow group relative">
                 <div className="flex justify-between items-start mb-4">
                     <div>
-                        <p className="text-slate-500 text-sm font-medium">Total Inflow</p>
+                        <p className="text-slate-500 text-sm font-medium">预估 Total Inflow</p>
                         <h3 className="text-2xl font-bold text-emerald-600 mt-1">{formatCurrency(cfMetrics.totalInflow)}</h3>
                     </div>
                     <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg">
@@ -89,13 +116,27 @@ const MetricsOverview: React.FC<MetricsOverviewProps> = ({
                     </div>
                 </div>
                 <div className="text-xs text-slate-400">Total processed deposits</div>
+                
+                {/* Currency Breakdown Tooltip */}
+                {Object.keys(currencyBreakdown.inflow).length > 0 && (
+                    <div className="absolute bottom-full left-0 mb-2 w-64 p-3 bg-slate-800 text-white text-xs rounded-lg shadow-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+                        <div className="font-semibold mb-2 text-sm">货币明细：</div>
+                        {Object.entries(currencyBreakdown.inflow).map(([currency, amount]) => (
+                            <div key={currency} className="flex justify-between items-center mb-1">
+                                <span>{currency}:</span>
+                                <span className="font-medium">{formatNumber(amount)}</span>
+                            </div>
+                        ))}
+                        <div className="absolute top-full left-4 -mt-1 border-4 border-transparent border-t-slate-800"></div>
+                    </div>
+                )}
             </div>
 
             {/* 2. Total Outflow */}
-            <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
+            <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow group relative">
                 <div className="flex justify-between items-start mb-4">
                     <div>
-                        <p className="text-slate-500 text-sm font-medium">Total Outflow</p>
+                        <p className="text-slate-500 text-sm font-medium">预估 Total Outflow</p>
                         <h3 className="text-2xl font-bold text-red-600 mt-1">{formatCurrency(cfMetrics.totalOutflow)}</h3>
                     </div>
                     <div className="p-2 bg-red-50 text-red-600 rounded-lg">
@@ -103,27 +144,27 @@ const MetricsOverview: React.FC<MetricsOverviewProps> = ({
                     </div>
                 </div>
                 <div className="text-xs text-slate-400">Total processed withdrawals</div>
+                
+                {/* Currency Breakdown Tooltip */}
+                {Object.keys(currencyBreakdown.outflow).length > 0 && (
+                    <div className="absolute bottom-full left-0 mb-2 w-64 p-3 bg-slate-800 text-white text-xs rounded-lg shadow-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+                        <div className="font-semibold mb-2 text-sm">货币明细：</div>
+                        {Object.entries(currencyBreakdown.outflow).map(([currency, amount]) => (
+                            <div key={currency} className="flex justify-between items-center mb-1">
+                                <span>{currency}:</span>
+                                <span className="font-medium">{formatNumber(amount)}</span>
+                            </div>
+                        ))}
+                        <div className="absolute top-full left-4 -mt-1 border-4 border-transparent border-t-slate-800"></div>
+                    </div>
+                )}
             </div>
 
-            {/* 3. Internal Transfer */}
-            <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
+            {/* 3. Net Cash Flow */}
+            <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow group relative">
                 <div className="flex justify-between items-start mb-4">
                     <div>
-                        <p className="text-slate-500 text-sm font-medium">Total Internal Transfer</p>
-                        <h3 className="text-2xl font-bold text-blue-600 mt-1">{formatCurrency(cfMetrics.totalInternalTransfer)}</h3>
-                    </div>
-                    <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
-                        <Repeat size={20} />
-                    </div>
-                </div>
-                <div className="text-xs text-slate-400">Internal account movements</div>
-            </div>
-
-            {/* 4. Net Cash Flow */}
-            <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
-                <div className="flex justify-between items-start mb-4">
-                    <div>
-                        <p className="text-slate-500 text-sm font-medium">Net Cash Flow</p>
+                        <p className="text-slate-500 text-sm font-medium">预估 Net Cash Flow</p>
                         <h3 className={`text-2xl font-bold mt-1 ${cfMetrics.netCashFlow >= 0 ? 'text-slate-800' : 'text-slate-600'}`}>
                             {formatCurrency(cfMetrics.netCashFlow)}
                         </h3>
@@ -133,6 +174,22 @@ const MetricsOverview: React.FC<MetricsOverviewProps> = ({
                     </div>
                 </div>
                 <div className="text-xs text-slate-400">Inflow - Outflow</div>
+                
+                {/* Currency Breakdown Tooltip */}
+                {Object.keys(currencyBreakdown.net).length > 0 && (
+                    <div className="absolute bottom-full left-0 mb-2 w-64 p-3 bg-slate-800 text-white text-xs rounded-lg shadow-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+                        <div className="font-semibold mb-2 text-sm">货币明细：</div>
+                        {Object.entries(currencyBreakdown.net).map(([currency, amount]) => (
+                            <div key={currency} className="flex justify-between items-center mb-1">
+                                <span>{currency}:</span>
+                                <span className={`font-medium ${amount >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>
+                                    {amount >= 0 ? '+' : ''}{formatNumber(amount)}
+                                </span>
+                            </div>
+                        ))}
+                        <div className="absolute top-full left-4 -mt-1 border-4 border-transparent border-t-slate-800"></div>
+                    </div>
+                )}
             </div>
         </div>
     );
